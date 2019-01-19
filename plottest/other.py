@@ -1,8 +1,13 @@
+import mayavi
 from mayavi import mlab
 import numpy as np
 from tvtk.tools import visual
+import matplotlib.pyplot as plt
+from PIL import Image
+import time
 class Environment():        
     def __init__(self):
+        mlab.close(all=True)
         f = mlab.figure(size=(900,500),bgcolor = (1,1,1))
         visual.set_viewer(f)  
         square_width = 23.5
@@ -24,7 +29,7 @@ class Environment():
         gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=2,height=2,width=2, color = (1,1,0))
         silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=2.75/2,radius =2.75/2,color = silver)
         silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=2.75/2,radius =2.75/2,color = silver)
-        
+    
         #randomly pick the red or blue side
         r = np.round(np.random.random(1)[0])
         b = 1 - r
@@ -40,19 +45,75 @@ class Environment():
         marker_bottom = visual.box(x=square_width,y=3*square_width/2 - 1, z = tape_height,length=square_width,height=2,width=tape_height,color=tape_color)
 
         #mlab.view(focalpoint=[d,d,0],distance=64, elevation=-80)
-        self.move_robot(-square_width,-square_width)
-        mlab.draw()
-        mlab.show()
-        print(mlab.view())
+        self.x = -square_width
+        self.y = -square_width
+        self.update_position()
         
-    def move_robot(self,x,y):
+
+        
+    def update_position(self):
         angle_d = 10
         angle_r = 10 * np.pi / 180
         view_distance = self.square_width * np.sqrt(2)
         shift = view_distance / np.sqrt(2)
         view_radius = view_distance / np.cos(angle_r)  
         #maybe add a z
-        fp = [x+shift,y+shift,0]
-        print(fp)
-        mlab.view(focalpoint=fp, distance=view_radius, elevation=-90 + angle_d)   
+        fp = [self.x+shift,self.y+shift,0]
+        #print(fp)
+        mlab.view(focalpoint=fp, distance=view_radius, elevation=-90 + angle_d, azimuth=45) 
+        mlab.show()
+    def move_position(self,left = 0,right = 0,forwards = 0,backwards = 0):
+        #left first
+        self.x += (-left / np.sqrt(2)) + (right / np.sqrt(2)) + (forwards / np.sqrt(2) )- (backwards / np.sqrt(2))
+        self.y += left / np.sqrt(2) - right / np.sqrt(2) + forwards / np.sqrt(2)  - backwards / np.sqrt(2)
 env = Environment()
+
+@mlab.animate(delay = 2000)
+def anim1():
+    env.move_position(left= 10)
+    env.update_position()
+    yield
+    
+@mlab.animate()
+def anim2(delay = 2000):
+    '''
+    for i in range(20):
+        env.move_position(forwards = 1)
+        env.update_position()
+        #global img
+        #img = mlab.screenshot()
+        #mlab.savefig('test.png')
+        print(i)
+        yield
+    for j in range(20):
+        env.move_position(right = 1)
+        env.update_position()
+        global img
+        #img = mlab.screenshot()
+        #mlab.savefig('test.png')
+        #print(i)
+        yield
+    '''
+    def save_image(n):
+        img = mlab.screenshot()
+        i = Image.fromarray(img)
+        gray = i.convert('L')
+        scale = 10
+        resized = gray.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
+        resized.save('test{}.png'.format(n))
+    save_image(0)
+    env.move_position(forwards =10)
+    env.update_position()
+    save_image(1)
+    yield
+    env.move_position(right= 10)
+    env.update_position()
+    save_image(2)
+    yield
+    env.move_position(left= 10)
+    env.update_position()
+    save_image(3)
+#anim1()
+anim2()
+#my_img = np.array()
+#mlab.close()
