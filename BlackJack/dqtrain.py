@@ -120,7 +120,7 @@ for i in range(iterations):
             else:
                 targets[i] = r + gamma * np.max(model.predict(np.expand_dims(n_s,0)))
         #perform gradient descent w/ batch
-        model.train_on_batch(x = states, y = targets)
+        print(model.train_on_batch(x = states, y = targets))
         #update state
         state = next_state
         if done:

@@ -1,6 +1,7 @@
 from mayavi import mlab
 import numpy as np
 from tvtk.tools import visual
+import tvtk.tools
 import matplotlib.pyplot as plt
 from PIL import Image
 from enum import Enum,auto
@@ -16,8 +17,9 @@ class Environment():
         mlab.close(all=True)
         self.width = 900
         self.height = 500
-        f = mlab.figure(size=(self.width,self.height),bgcolor = (1,1,1))
-        visual.set_viewer(f)  
+        self.f = mlab.figure(size=(self.width,self.height),bgcolor = (1,1,1))
+        self.f.scene._lift()
+        visual.set_viewer(self.f)  
         self.square_width = 23.5
         a_side = 34.5
         tape_height = .2
@@ -31,9 +33,12 @@ class Environment():
         locations = [[-d,d],[0,0],[d,-d]]
         np.random.shuffle(locations)
         #place minerals
-        self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=2,height=2,width=2, color = (1,1,0))
-        self.silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=2.75/2,radius =2.75/2,color = silver)
-        self.silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=2.75/2,radius =2.75/2,color = silver)
+
+        #self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=4,height=4,width=4, color = (1,1,0))
+        mineral_radius = 2.75 * 2
+        self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = (1,1,0) )
+        self.silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=mineral_radius,radius =mineral_radius,color = silver)
+        self.silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=mineral_radius,radius =mineral_radius,color = silver)
 
         #randomly pick the red or blue side
         r = np.round(np.random.random(1)[0])
@@ -50,13 +55,13 @@ class Environment():
         self.marker_top = visual.box(x=self.square_width,y=3*self.square_width/2 - 1, z = tape_height,length=self.square_width,height=2,width=tape_height,color=tape_color)
 
         #mlab.view(focalpoint=[d,d,0],distance=64, elevation=-80)
-        self.x = -self.square_width
-        self.y = -self.square_width
+        self.x = -(self.square_width - 5) * np.random.random() - 5
+        self.y = -(self.square_width - 5) * np.random.random() - 5
         self.update_position()
         
         self.move_distance = 2
     def update_position(self):
-        angle_d = 10
+        angle_d = 6
         angle_r = 10 * np.pi / 180
         view_distance = self.square_width * np.sqrt(2)
         shift = view_distance / np.sqrt(2)
@@ -101,7 +106,7 @@ class Environment():
         if y is None:
             y = self.y
         apothem = self.square_width * 3 / 2
-        if x > apothem or x < -apothem or self.y > apothem or self.y < -apothem:
+        if x > apothem or x < -apothem or y > apothem or y < -apothem:
             return State.ILLEGAL
         if self.check_collision(self.silver_mineral_1) or self.check_collision(self.silver_mineral_2):
             return State.LOSS
@@ -123,7 +128,11 @@ class Environment():
     
     def sample(self):
         actions = self.legal_actions()
-        return np.random.shuffle(actions)[0]
+        assert 1 in actions, "no legal actions to sample"
+        action = np.random.randint(4)
+        while actions[action] == 0:
+            action = np.random.randint(4)
+        return action
   
     #visual.box(x=33,y=22,z=1, length=2,height=2,width=2, color = (1,1,0))
     #checks the collision with a mineral at a given x,y. Defaults to the robot x,y
@@ -137,52 +146,87 @@ class Environment():
         moves[action] = self.move_distance
         
         #transition to new state
+        previous_x = self.x
+        previous_y = self.y
         self.move_position(*moves)
         self.update_position()
         
         #get the reward
         game_state = self.state()
-        assert (game_state != State.ILLEGAL), "transitioned to an illegal state"
+        assert (game_state != State.ILLEGAL), "transitioned to an illegal state with action {} and distance".format(action,self.move_distance)
+        
+    
         if game_state == State.WIN:
-            reward = 10
+            reward = 100
             done = True
         elif game_state == State.LOSS:
             reward = -10
             done = True
         else:
+            '''def distance(x1,y1,x2,y2):
+                return np.sqrt((x2-x1)**2 + (y2-y1)**2)
+            previous_distance = distance(previous_x,previous_y,self.gold_mineral.x,self.gold_mineral.y)
+            current_distance = distance(self.x,self.y,self.gold_mineral.x,self.gold_mineral.y)
+            if previous_distance > current_distance:
+                reward = -1
+            else:
+                reward = -2'''
             reward = -1
             done = False
             
         next_state = self.screenshot()
         
-        return next_state, reward, done
+        return next_state, reward, done, game_state
+    def sample_image(self): 
+        shot = mlab.screenshot()
+        img = Image.fromarray(shot)
+        #gray = img.convert('L')
+        scale = 20
+        resized = img.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
+        return resized
+        #resized.save('test{}.png'.format(n))
+    def screenshot(self):
+        resized = self.sample_image()
+        array = list(resized.getdata())
+        #np.shape(img) for dimensions
+        return list(np.asarray(array) / 255)
+ 
         
-    
+    def reset(self, random = True):
+        #shuffle minerals
+        d = 14.5 / np.sqrt(2)
+        locations = [[-d,d],[0,0],[d,-d]]
+        np.random.shuffle(locations)
+        #print(locations)
+        self.gold_mineral.x = locations[0][0]
+        self.gold_mineral.y = locations[0][1]
+        self.silver_mineral_1.x = locations[1][0]
+        self.silver_mineral_1.y = locations[1][1]
+        self.silver_mineral_2.x = locations[2][0]
+        self.silver_mineral_2.y = locations[2][1]
         
-    def reset(self):
-        self.x = -self.square_width
-        self.y = -self.square_width
-        self.update_position()
+        if random:
+            self.x = -(self.square_width - 5) * np.random.random() - 5
+            self.y = -(self.square_width - 5) * np.random.random() - 5
+        else: 
+            self.x = -self.square_width
+            self.y = -self.square_width
+      
+
         r = np.round(np.random.random(1)[0])
         b = 1 - r
         tape_color = (r,0,b)
+        
         self.vertical_lander_tape.color = tape_color
         self.h_lander_tape.color = tape_color
         self.marker_left.color = tape_color
         self.marker_right.color = tape_color
         self.marker_bottom.color = tape_color
         self.marker_top.color = tape_color
+        self.update_position()
+        return self.screenshot()
         
-    def screenshot(self):
-        shot = mlab.screenshot()
-        img = Image.fromarray(shot)
-        gray = img.convert('L')
-        scale = 10
-        resized = gray.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
-        #resized.save('test{}.png'.format(n))
-        array = list(resized.getdata())
-        #np.shape(img) for dimensions
-        return array
+
     
     
         

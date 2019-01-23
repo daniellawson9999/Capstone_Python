@@ -4,23 +4,28 @@ import numpy as np
 import collections
 
 epsilon = 1
-gamma = .6
-alpha = .7
+gamma = .9
+alpha = .001
 
-iterations = 1000
+iterations =500
 decay_rate = 1/iterations
-test_iterations = 1000
+test_iterations = 50
+max_moves = 25
 
-max_memory_size = iterations * 2
-batch_size = 10
+
+max_memory_size = iterations * max_moves
+batch_size = int(max_moves/3)
+
 
 wins = 0
-draws = 0
+losses = 0
+reached_max = 0
+
+training_win = 0
+training_loss = 0 
 
 env = environment.Environment()
-
-def convert_to_int(state):
-    return (state[0],state[1],int(state[2]))
+image_size = np.shape(env.screenshot())
 
  #based off deque example
 class ReplayMemory():
@@ -28,7 +33,7 @@ class ReplayMemory():
         self.memory = collections.deque(maxlen = size)
         
     def store(self, transition):
-        #transition should be an array of s,a,r,s',t
+        #transition should be an array of s,a,l,r,s',t
         self.memory.append(transition)
         
     def sample(self,n):
@@ -38,31 +43,33 @@ class ReplayMemory():
     
 
     
-memory = ReplayMemory(iterations*2)
+memory = ReplayMemory(max_memory_size)
 
 #initialize memory to batch size
     
 while len(memory.memory) < batch_size:
-    state = convert_to_int(env.reset())
+    state = env.reset()
     done = False
-    while not done:
-        action = env.action_space.sample()
-        next_state, reward, done, info = env.step(action)
-        next_state = convert_to_int(next_state)
-        transition = [state, action,reward,next_state,int(done)]
+    for i in range(max_moves):
+        action = env.sample()
+        next_state, reward, done,_ = env.step(action)
+        transition = [state, action, env.legal_actions(),reward,next_state,int(done)]
         memory.store(transition)
         state = next_state
-
+        if len(memory.memory) >= batch_size: break
 
 
 #q network
 
 
 #define the nn structure
-inputs = tf.keras.Input(shape=(3,))
-hidden = tf.keras.layers.Dense(3, activation= tf.keras.activations.relu)(inputs)
-outputs= tf.keras.layers.Dense(2, activation= tf.keras.activations.linear)(hidden)
-model =  tf.keras.Model(inputs=inputs, outputs=outputs)
+with tf.device("/GPU:0"):
+    inputs = tf.keras.Input(shape=image_size)
+    flat = tf.keras.layers.Flatten()(inputs)
+    hidden1 = tf.keras.layers.Dense(int(np.round(np.product(image_size)/10)), activation= tf.keras.activations.relu)(flat)
+    hidden2 = tf.keras.layers.Dense(int(np.round(np.product(image_size)/10)), activation= tf.keras.activations.relu)(hidden1)
+    outputs= tf.keras.layers.Dense(env.action_space(), activation= tf.keras.activations.linear)(hidden2)
+    model =  tf.keras.Model(inputs=inputs, outputs=outputs)
 
 
 #define loss function 
@@ -84,62 +91,82 @@ def q_loss(y_true, y_pred):
     #q = tf.keras.backend.max(y_pred)
     return tf.keras.backend.mean(tf.keras.backend.square(y_true-y_pred))
     #return tf.math.reduce_sum(tf.math.squared_difference(y_true,y_pred)) / 2
+#np.argmax(model.predict(np.expand_dims(state,0))) 
+def predict(state,legal_actions = env.legal_actions()):
+    actions = model.predict(np.expand_dims(state,0))[0]
+    max_index = 0
+    for i in range(np.size(actions)):
+        if legal_actions[max_index] == 0 and legal_actions[i] == 1:
+            max_index = i
+        if actions[max_index] < actions[i] and legal_actions[i] == 1:
+            max_index = i
+    return max_index   
+     
+model.compile(loss = q_loss ,optimizer = tf.keras.optimizers.SGD(lr=alpha))
 
-model.compile(loss = q_loss,optimizer = 'SGD')
 
 #begin training
 for i in range(iterations):
-    state = convert_to_int(env.reset())
-    
-    for t in range(10):
+    print("starting iteration ",i)
+    total_reward = 0
+    state = env.reset()
+    a = []
+    for m in range(max_moves):
         #select an action
         if np.random.random() > epsilon:
-            action = np.argmax(model.predict(np.expand_dims(state,0)))
+            action = predict(state,env.legal_actions())
 
         else:
-            action = env.action_space.sample()
+            action = env.sample()
         #transition
-        next_state, reward, done, info = env.step(action)
-        next_state = convert_to_int(next_state)
+        next_state, reward, done,game_state = env.step(action)
+        total_reward += reward
         #store transition
-        transition = [state,action,reward,next_state,int(done)]
+        transition = [state,action,env.legal_actions(),reward,next_state,int(done)]
         memory.store(transition)
         #sample batch of transitions from memory
         batch = memory.sample(batch_size)
         states = np.asarray(tuple(batch[:,0]))
         #obtain the targets, y
         targets = np.zeros(batch_size)
-        for i in range(batch_size):
-            s = batch[i,0]
-            a = batch[i,1]
-            r = batch[i,2]
-            n_s = batch[i,3]
-            t = batch[i,4]
+        for j in range(batch_size):
+            s = batch[j,0]
+            a = batch[j,1]
+            l = batch[j,2]
+            r = batch[j,3]
+            n_s = batch[j,4]
+            t = batch[j,5]
             if t:
-                targets[i] = r
+                targets[j] = r
             else:
-                targets[i] = r + gamma * np.max(model.predict(np.expand_dims(n_s,0)))
+                targets[j] = r + gamma * predict(n_s,l)
         #perform gradient descent w/ batch
         model.train_on_batch(x = states, y = targets)
+        
         #update state
         state = next_state
-        if done:
+        if done or m == max_moves - 1:
+            if game_state == environment.State.WIN:
+                training_win += 1
+            if game_state == environment.State.LOSS:
+                training_loss += 1
+            print("total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
             #print("Episode finished after {} timesteps".format(t+1))
             epsilon -= decay_rate
+            #print(epsilon)
             break
 #evaluate
 for i in range(test_iterations):
-    state = convert_to_int(env.reset())
-    for t in range(10):
-        action = np.argmax(model.predict(np.expand_dims(state,0)))
+    state = env.reset()
+    for t in range(max_moves):
+        action = predict(state,env.legal_actions())
         #action = env.action_space.sample()
-        next_state, reward, done, info = env.step(action)
-        state = convert_to_int(next_state)
+        next_state, reward, done, game_state = env.step(action)
         if done:
-            if reward == 1:
+            if game_state == environment.State.WIN:
                 wins += 1
-            elif reward == 0:
-                draws += 1
+            elif game_state == environment.State.LOSS:
+                losses += 1
             break
-losses = test_iterations - wins - draws
-print("{} win, {} draw, {} loss".format(wins/test_iterations, draws/test_iterations,losses/test_iterations))
+print("{} wins, {} losses, {} reached max".format(wins/test_iterations, losses/test_iterations,(test_iterations-wins-losses)/test_iterations))
+model.save('robot.h5')
