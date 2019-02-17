@@ -12,7 +12,10 @@ class State(Enum):
     ILLEGAL = auto()
     STANDARD = auto()   
 
-class Environment():  
+class Environment():
+    win_reward = 100
+    loss_reward = -100
+    move_reward = -1
     def __init__(self):
         mlab.close(all=True)
         self.width = 900
@@ -146,8 +149,7 @@ class Environment():
         moves[action] = self.move_distance
         
         #transition to new state
-        previous_x = self.x
-        previous_y = self.y
+   
         self.move_position(*moves)
         self.update_position()
         
@@ -157,10 +159,10 @@ class Environment():
         
     
         if game_state == State.WIN:
-            reward = 150
+            reward = self.win_reward
             done = True
         elif game_state == State.LOSS:
-            reward = -150
+            reward = self.loss_reward
             done = True
         else:
             '''def distance(x1,y1,x2,y2):
@@ -171,7 +173,7 @@ class Environment():
                 reward = -1
             else:
                 reward = -2'''
-            reward = -1
+            reward = self.move_reward
             done = False
             
         next_state = self.screenshot()

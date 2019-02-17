@@ -14,6 +14,9 @@ class State(Enum):
 
 class Environment():  
     square_width = 23.5
+    win_reward = 100
+    loss_reward = -100
+    move_reward = -1
     def get_pos_angle(self,x,y):
         angle = np.arctan(y/x) * 180 / np.pi
         if x < 0:
@@ -130,16 +133,17 @@ class Environment():
         actions = [0,0,0,0,1,1]
         pos,focal = mlab.move()
         v = focal - pos
+        v = np.asarray((v[0],v[1]))
         v /= np.linalg.norm(v)
         w = np.asarray((-v[1],v[0]))
-        
-        if self.state(self.move_distance * w + pos) != State.ILLEGAL:
+        pos = np.asarray((pos[0],pos[1]))
+        if self.state(*(self.move_distance * w + pos)) != State.ILLEGAL:
             actions[0] = 1
-        if self.state(self.move_distance * -w + pos) != State.ILLEGAL:
+        if self.state(*(self.move_distance * -w + pos)) != State.ILLEGAL:
             actions[1] = 1
-        if self.state(self.move_distance * v + pos) != State.ILLEGAL:
+        if self.state(*(self.move_distance * v + pos)) != State.ILLEGAL:
             actions[2] = 1
-        if self.state(self.move_distance * -v + pos) != State.ILLEGAL:
+        if self.state(*(self.move_distance * -v + pos)) != State.ILLEGAL:
             actions[3] = 1
         return actions
     
@@ -163,9 +167,13 @@ class Environment():
         moves[action] = self.move_distance
         if action == 4 or action == 5:
             moves[action] = self.turn_angle
+            
+            
+        #store previous position
+        previous_pos = mlab.move()[0]
         #transition to new state
         self.move_position(*moves)
-
+        new_pos = mlab.move()[0]
         
         #get the reward
         game_state = self.state()
@@ -173,21 +181,21 @@ class Environment():
         
     
         if game_state == State.WIN:
-            reward = 100
+            reward = self.win_reward
             done = True
         elif game_state == State.LOSS:
-            reward = -10
+            reward = self.loss_reward
             done = True
         else:
-            '''def distance(x1,y1,x2,y2):
+            def distance(x1,y1,x2,y2):
                 return np.sqrt((x2-x1)**2 + (y2-y1)**2)
-            previous_distance = distance(previous_x,previous_y,self.gold_mineral.x,self.gold_mineral.y)
-            current_distance = distance(self.x,self.y,self.gold_mineral.x,self.gold_mineral.y)
+            previous_distance = distance(previous_pos[0],previous_pos[1],self.gold_mineral.x,self.gold_mineral.y)
+            current_distance = distance(new_pos[0],new_pos[1],self.gold_mineral.x,self.gold_mineral.y)
             if previous_distance > current_distance:
-                reward = -1
+                reward = self.move_reward
             else:
-                reward = -2'''
-            reward = -1
+                reward = self.move_reward * 2
+            #reward = self.move_reward
             done = False
             
         next_state = self.screenshot()

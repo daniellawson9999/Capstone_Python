@@ -11,7 +11,8 @@ iterations =50
 decay_rate = 1/iterations
 test_iterations = 50
 max_moves = 100
-
+win_reward = max_moves * 2 
+loss_reward = -win_reward
 
 max_memory_size = iterations * max_moves
 batch_size = int(max_moves/3)
@@ -25,6 +26,9 @@ training_win = 0
 training_loss = 0 
 
 env = environment.Environment()
+env.loss_reward = loss_reward
+env.win_reward = win_reward
+
 image_size = np.shape(env.screenshot())
 
  #based off deque example

@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 test_iterations = 50
-max_moves = 200
+max_moves = 300
 wins  = 0
 losses = 0
 

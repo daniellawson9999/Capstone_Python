@@ -7,14 +7,16 @@ epsilon = 1
 gamma = .9
 alpha = .001
 
-iterations = 50
+iterations = 100
 decay_rate = 1/iterations
 test_iterations = 25
-max_moves = 50
+max_moves =  50
+win_reward = max_moves * 3
+loss_reward = -win_reward
 
 
 max_memory_size = iterations * max_moves
-batch_size = int(max_moves/3)
+batch_size = int(10)
 
 
 wins = 0
@@ -25,6 +27,9 @@ training_win = 0
 training_loss = 0 
 
 env = environment.Environment()
+env.loss_reward = loss_reward
+env.win_reward = win_reward
+
 image_size = np.shape(env.screenshot())
 
  #based off deque example
@@ -66,8 +71,8 @@ while len(memory.memory) < batch_size:
 with tf.device("/GPU:0"):
     inputs = tf.keras.Input(shape=image_size)
     flat = tf.keras.layers.Flatten()(inputs)
-    hidden1 = tf.keras.layers.Dense(int(np.round(np.product(image_size)/10)), activation= tf.keras.activations.relu)(flat)
-    hidden2 = tf.keras.layers.Dense(int(np.round(np.product(image_size)/10)), activation= tf.keras.activations.relu)(hidden1)
+    hidden1 = tf.keras.layers.Dense(int(np.round(np.product(image_size)/5)), activation= tf.keras.activations.linear)(flat)
+    hidden2 = tf.keras.layers.Dense(int(np.round(np.product(image_size)/5)), activation= tf.keras.activations.linear)(hidden1)
     outputs= tf.keras.layers.Dense(env.action_space(), activation= tf.keras.activations.linear)(hidden2)
     model =  tf.keras.Model(inputs=inputs, outputs=outputs)
 
