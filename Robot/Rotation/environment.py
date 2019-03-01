@@ -25,7 +25,7 @@ class Environment():
     def random_position(self):
             
         def rand_coordinate():
-            return (np.random.random() * Environment.square_width + Environment.square_width / 2) * np.power(-1,np.random.randint (0,2))
+            return (np.random.random() * Environment.square_width  + Environment.square_width / 2) * np.power(-1,np.random.randint (0,2))
         x = rand_coordinate()
         y = rand_coordinate()
         angle = self.get_pos_angle(x,y)
@@ -43,7 +43,8 @@ class Environment():
         #distance between minerals
         d = 14.5 / np.sqrt(2)
         #color for silver
-        silver = (.8,.8,.8)
+        #silver = (.8,.8,.8)
+        silver = (.5,.5,.7)
         #reate field
         self.floor_3_3 = visual.box(x=0,y=0,z=-1, length = 23.5*3,height = 23.5*3,width = 2,color = (.4,.4,.4))  
         #randomize starting locations
@@ -52,7 +53,7 @@ class Environment():
         #place minerals
 
         #self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=4,height=4,width=4, color = (1,1,0))
-        mineral_radius = 2.75 * 2
+        mineral_radius = 2.75 * 1.5
         self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = (1,1,0) )
         self.silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=mineral_radius,radius =mineral_radius,color = silver)
         self.silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=mineral_radius,radius =mineral_radius,color = silver)
@@ -108,6 +109,7 @@ class Environment():
             rad = mineral.length / 2
         else:
             rad = mineral.radius
+        rad *= 1.2
         if x <= mineral.x + rad and x >= mineral.x - rad and y <= mineral.y + rad and y >= mineral.y - rad:
             return True
         return False
@@ -205,15 +207,15 @@ class Environment():
         shot = mlab.screenshot()
         img = Image.fromarray(shot)
         #gray = img.convert('L')
-        scale = 20
+        scale = 15
         resized = img.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
         return resized
         #resized.save('test{}.png'.format(n))
     def screenshot(self):
         resized = self.sample_image()
-        array = list(resized.getdata())
+        array = np.asarray(resized)
         #np.shape(img) for dimensions
-        return list(np.asarray(array) / 255)
+        return array / 255
  
         
     def reset(self, random = True):
