@@ -63,12 +63,13 @@ class Environment():
         if self.random_minerals:
             np.random.shuffle(locations)
         return locations
-    def __init__(self,random_minerals=True,random_location=True, mineral_location= Location.CENTER, reward = Reward.RELATIVE):
+    def __init__(self,random_minerals=True,random_location=True, mineral_location= Location.CENTER, reward = Reward.RELATIVE, grayscale = False, flat = False):
         self.random_minerals = random_minerals
         self.random_location = random_location
         self.mineral_location = mineral_location
         self.reward = reward
-        
+        self.grayscale = grayscale
+        self.flat = flat
         mlab.close(all=True)
         self.width = 900
         self.height = 500
@@ -222,21 +223,22 @@ class Environment():
             reward = self.loss_reward
             done = True
         else:
-            def distance(x1,y1,x2,y2):
-                return np.sqrt((x2-x1)**2 + (y2-y1)**2)
-            previous_distance = distance(previous_pos[0],previous_pos[1],self.gold_mineral.x,self.gold_mineral.y)
-            current_distance = distance(new_pos[0],new_pos[1],self.gold_mineral.x,self.gold_mineral.y)
-            if self.reward == Reward.RELATIVE:
-                if previous_distance > current_distance:
-                    reward = self.move_reward
-                else:
-                    reward = self.move_reward * 2
-            elif self.reward == Reward.PROPORTIONAL:
-                reward = -current_distance / 10
-            else:
-                reward = self.move_reward
-            #reward = self.move_reward
             done = False
+        def distance(x1,y1,x2,y2):
+            return np.sqrt((x2-x1)**2 + (y2-y1)**2)
+        previous_distance = distance(previous_pos[0],previous_pos[1],self.gold_mineral.x,self.gold_mineral.y)
+        current_distance = distance(new_pos[0],new_pos[1],self.gold_mineral.x,self.gold_mineral.y)
+        if self.reward == Reward.RELATIVE:
+            if previous_distance > current_distance:
+                reward = self.move_reward
+            else:
+                reward = self.move_reward * 2
+        elif self.reward == Reward.PROPORTIONAL:
+            reward = current_distance**2 / -100
+        else:
+            reward = self.move_reward
+                #reward = self.move_reward
+               
             
         next_state = self.screenshot()
         
@@ -244,16 +246,20 @@ class Environment():
     def sample_image(self): 
         shot = mlab.screenshot()
         img = Image.fromarray(shot)
-        #gray = img.convert('L')
+        if self.grayscale:
+            img = img.convert('L')
         scale = 15
         resized = img.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
         return resized
         #resized.save('test{}.png'.format(n))
     def screenshot(self):
         resized = self.sample_image()
-        array = resized.getdata()
-        array = np.asarray(array)
-        array = array.ravel()
+        if self.flat:
+            array = resized.getdata()
+            array = np.asarray(array)
+            array = array.ravel()
+        else:
+            array = np.asarray(resized)
         array = array / 255
         #array = np.asarray(resized)
         #np.shape(img) for dimensions
