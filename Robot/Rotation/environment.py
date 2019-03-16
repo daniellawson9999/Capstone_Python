@@ -12,6 +12,16 @@ class State(Enum):
     ILLEGAL = auto()
     STANDARD = auto()   
 
+class Location(Enum):
+    LEFT = 0
+    CENTER = 1
+    RIGHT = 2
+
+class Reward(Enum):
+    TERMINAL = auto()
+    RELATIVE = auto()
+    PROPORTIONAL = auto()
+    
 class Environment():  
     square_width = 23.5
     win_reward = 100
@@ -30,7 +40,35 @@ class Environment():
         y = rand_coordinate()
         angle = self.get_pos_angle(x,y)
         return x,y,angle
-    def __init__(self):
+    
+    def get_start_position(self):
+        if self.random_location:
+            return self.random_position()
+        else:
+            #the fixed starting position
+            x = -self.square_width
+            y = -self.square_width
+            angle = self.get_pos_angle(x,y)
+            return x,y,angle
+            
+            
+    def get_mineral_locations(self):
+        d = self.d
+        if self.mineral_location == Location.LEFT:
+            locations = [[-d,d],[0,0],[d,-d]]
+        elif(self.mineral_location == Location.RIGHT):
+            locations = [[d,-d],[-d,d],[0,0]]
+        else:
+            locations = [[0,0],[-d,d],[d,-d]]        
+        if self.random_minerals:
+            np.random.shuffle(locations)
+        return locations
+    def __init__(self,random_minerals=True,random_location=True, mineral_location= Location.CENTER, reward = Reward.RELATIVE):
+        self.random_minerals = random_minerals
+        self.random_location = random_location
+        self.mineral_location = mineral_location
+        self.reward = reward
+        
         mlab.close(all=True)
         self.width = 900
         self.height = 500
@@ -41,17 +79,14 @@ class Environment():
         a_side = 34.5
         tape_height = .2
         #distance between minerals
-        d = 14.5 / np.sqrt(2)
+        self.d = 14.5 / np.sqrt(2)
         #color for silver
         #silver = (.8,.8,.8)
         silver = (.5,.5,.7)
         #reate field
         self.floor_3_3 = visual.box(x=0,y=0,z=-1, length = 23.5*3,height = 23.5*3,width = 2,color = (.4,.4,.4))  
-        #randomize starting locations
-        locations = [[-d,d],[0,0],[d,-d]]
-        np.random.shuffle(locations)
-        #place minerals
-
+        #get mineral location
+        locations = self.get_mineral_locations()
         #self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=4,height=4,width=4, color = (1,1,0))
         mineral_radius = 2.75 * 1.5
         self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = (1,1,0) )
@@ -72,10 +107,8 @@ class Environment():
         self.marker_bottom = visual.box(x=self.square_width,y=self.square_width/2 + 1, z = tape_height,length=self.square_width,height=2,width=tape_height,color=tape_color)
         self.marker_top = visual.box(x=self.square_width,y=3*self.square_width/2 - 1, z = tape_height,length=self.square_width,height=2,width=tape_height,color=tape_color)
 
-        self.x, self.y, self.pos_angle = self.random_position()
-        self.first_angle = self.pos_angle
+        self.x, self.y, self.pos_angle = self.get_start_position()
         self.init_position()
-    
         self.move_distance = 2
         self.turn_angle = 5
     def init_position(self):
@@ -89,7 +122,7 @@ class Environment():
         #fp = [self.x-shift*np.sign(np.cos(rad)),self.y-shift*np.sign(np.sin(rad)),0]
         fp = [self.x-shift*np.cos(rad),self.y-shift*np.sin(rad),4]
         #print(fp)
-        mlab.view(focalpoint=fp, distance=view_radius, elevation=-90 + angle, azimuth=self.pos_angle)#self.first_angle
+        mlab.view(focalpoint=fp, distance=view_radius, elevation=-90 + angle, azimuth=self.pos_angle)
         mlab.show()
     
     def move_position(self,left = 0,right = 0,forwards = 0,backwards = 0, pos_angle = 0, neg_angle = 0, set_value = True):
@@ -193,10 +226,15 @@ class Environment():
                 return np.sqrt((x2-x1)**2 + (y2-y1)**2)
             previous_distance = distance(previous_pos[0],previous_pos[1],self.gold_mineral.x,self.gold_mineral.y)
             current_distance = distance(new_pos[0],new_pos[1],self.gold_mineral.x,self.gold_mineral.y)
-            if previous_distance > current_distance:
-                reward = self.move_reward
+            if self.reward == Reward.RELATIVE:
+                if previous_distance > current_distance:
+                    reward = self.move_reward
+                else:
+                    reward = self.move_reward * 2
+            elif self.reward == Reward.PROPORTIONAL:
+                reward = -current_distance / 10
             else:
-                reward = self.move_reward * 2
+                reward = self.move_reward
             #reward = self.move_reward
             done = False
             
@@ -213,16 +251,18 @@ class Environment():
         #resized.save('test{}.png'.format(n))
     def screenshot(self):
         resized = self.sample_image()
-        array = np.asarray(resized)
+        array = resized.getdata()
+        array = np.asarray(array)
+        array = array.ravel()
+        array = array / 255
+        #array = np.asarray(resized)
         #np.shape(img) for dimensions
-        return array / 255
+        return array
  
         
-    def reset(self, random = True):
+    def reset(self):
         #shuffle minerals
-        d = 14.5 / np.sqrt(2)
-        locations = [[-d,d],[0,0],[d,-d]]
-        np.random.shuffle(locations)
+        locations = self.get_mineral_locations()
         #print(locations)
         self.gold_mineral.x = locations[0][0]
         self.gold_mineral.y = locations[0][1]
@@ -231,13 +271,8 @@ class Environment():
         self.silver_mineral_2.x = locations[2][0]
         self.silver_mineral_2.y = locations[2][1]
         
-        if random:
-            self.x, self.y, self.pos_angle = self.random_position()
-        else: 
-            self.x = -self.square_width
-            self.y = -self.square_width
-            self.pos_angle = self.get_pos_angle(self.x,self.y)
-        self.first_angle = self.pos_angle
+        self.x, self.y, self.pos_angle = self.get_start_position()
+        
         r = np.round(np.random.random(1)[0])
         b = 1 - r
         tape_color = (r,0,b)
