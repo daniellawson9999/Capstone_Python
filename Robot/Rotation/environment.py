@@ -21,6 +21,14 @@ class Reward(Enum):
     TERMINAL = auto()
     RELATIVE = auto()
     PROPORTIONAL = auto()
+
+class Action(Enum):
+    LEFT = auto()
+    RIGHT = auto()
+    FORWARDS = auto()
+    BACKWARDS = auto()
+    CW = auto()
+    CCW = auto()
     
 class Environment():  
     square_width = 23.5
@@ -63,13 +71,31 @@ class Environment():
         if self.random_minerals:
             np.random.shuffle(locations)
         return locations
-    def __init__(self,random_minerals=True,random_location=True, mineral_location= Location.CENTER, reward = Reward.RELATIVE, grayscale = False, flat = False):
+    
+    def get_action_index_dictionary(self):
+        d = {}
+        #initialize each action as None by iterating through the enum Action and setting in a dictionary
+        for a in Action:
+            d[a] = None
+        #assign an index to each available action, leave actions not being used as null
+        index = 0
+        for a in self.actions:
+            d[a] = index
+            index += 1
+        return d
+    
+    def __init__(self,random_minerals=True,random_location=True, mineral_location= Location.CENTER,
+                 reward = Reward.RELATIVE, grayscale = False, flat = False,
+                 actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW]):
+        
         self.random_minerals = random_minerals
         self.random_location = random_location
         self.mineral_location = mineral_location
         self.reward = reward
         self.grayscale = grayscale
         self.flat = flat
+        self.actions = actions
+        self.actions_index_dict = self.get_action_index_dictionary()
         mlab.close(all=True)
         self.width = 900
         self.height = 500
@@ -131,7 +157,7 @@ class Environment():
         mlab.yaw(pos_angle - neg_angle)
         
     def action_space(self):
-        return 6
+        return len(self.actions)
     
     def check_collision(self, mineral, x = None, y = None):
         pos = mlab.move()[0]
@@ -167,18 +193,23 @@ class Environment():
     
     def legal_actions(self):
         actions = [0,0,0,0,1,1]
+        actions = [0] * self.action_space()
         pos,focal = mlab.move()
         v = focal - pos
         v = np.asarray((v[0],v[1]))
         v /= np.linalg.norm(v)
         w = np.asarray((-v[1],v[0]))
         pos = np.asarray((pos[0],pos[1]))
+        #left
         if self.state(*(self.move_distance * w + pos)) != State.ILLEGAL:
             actions[0] = 1
+        #right
         if self.state(*(self.move_distance * -w + pos)) != State.ILLEGAL:
             actions[1] = 1
+        #forwards
         if self.state(*(self.move_distance * v + pos)) != State.ILLEGAL:
             actions[2] = 1
+        #backwards
         if self.state(*(self.move_distance * -v + pos)) != State.ILLEGAL:
             actions[3] = 1
         return actions
@@ -199,12 +230,11 @@ class Environment():
         #verify action is 
         assert (self.legal_actions()[action] == 1), "action not legal"
         
-        moves = [0,0,0,0,0,0]
-        moves[action] = self.move_distance
+        moves = [0] * self.action_space()
         if action == 4 or action == 5:
             moves[action] = self.turn_angle
-            
-            
+        else:
+            moves[action] = self.move_distance
         #store previous position
         previous_pos = mlab.move()[0]
         #transition to new state
@@ -224,20 +254,20 @@ class Environment():
             done = True
         else:
             done = False
-        def distance(x1,y1,x2,y2):
-            return np.sqrt((x2-x1)**2 + (y2-y1)**2)
-        previous_distance = distance(previous_pos[0],previous_pos[1],self.gold_mineral.x,self.gold_mineral.y)
-        current_distance = distance(new_pos[0],new_pos[1],self.gold_mineral.x,self.gold_mineral.y)
-        if self.reward == Reward.RELATIVE:
-            if previous_distance > current_distance:
-                reward = self.move_reward
+            def distance(x1,y1,x2,y2):
+                return np.sqrt((x2-x1)**2 + (y2-y1)**2)
+            previous_distance = distance(previous_pos[0],previous_pos[1],self.gold_mineral.x,self.gold_mineral.y)
+            current_distance = distance(new_pos[0],new_pos[1],self.gold_mineral.x,self.gold_mineral.y)
+            if self.reward == Reward.RELATIVE:
+                if previous_distance > current_distance:
+                    reward = self.move_reward
+                else:
+                    reward = self.move_reward * 2
+            elif self.reward == Reward.PROPORTIONAL:
+                reward = current_distance**2 / -100
             else:
-                reward = self.move_reward * 2
-        elif self.reward == Reward.PROPORTIONAL:
-            reward = current_distance**2 / -100
-        else:
-            reward = self.move_reward
-                #reward = self.move_reward
+                reward = self.move_reward
+                    #reward = self.move_reward
                
             
         next_state = self.screenshot()

@@ -8,10 +8,10 @@ epsilon = 1
 gamma = .95
 alpha = .0003
 
-iterations = 50
+iterations = 80
 decay_rate = 1/iterations
 test_iterations = 10
-max_moves =  100
+max_moves =  60
 win_reward = max_moves*2
 loss_reward = -win_reward
 
@@ -28,11 +28,16 @@ reward_list = []
 training_win = 0
 training_loss = 0 
 
-env = environment.Environment(random_minerals=False,random_location=False,mineral_location=environment.Location.RIGHT,reward=environment.Reward.PROPORTIONAL)
+env = environment.Environment(random_minerals=False,random_location=False,mineral_location=environment.Location.RIGHT,reward=environment.Reward.PROPORTIONAL,grayscale =True)
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 
 image_shape = np.shape(env.screenshot())
+image_len = len(image_shape)
+if image_len == 2:
+    image_shape = image_shape + (1,)
+    
+num_actions = env.action_space()
 
 evaluate_training = True
 save_model = True
@@ -85,15 +90,15 @@ with tf.device("/GPU:0"):
     
     #state cnn combined with fc action to create a sa convnet
     image_input = tf.keras.Input(shape=image_shape)
-    conv1 = tf.keras.layers.Conv2D(16, kernel_size=(3, 3), activation=tf.keras.activations.relu, input_shape=image_shape,strides=1)(image_input)
-    drop1 = tf.keras.layers.Dropout(0.5)(conv1)
-    conv2 = tf.keras.layers.Conv2D(16, kernel_size=(3, 3), strides=1, activation='relu')(drop1)
-    drop2 = tf.keras.layers.Dropout(0.5)(conv2)
-    flat = tf.keras.layers.Flatten()(drop2)
-    conv_dense = tf.keras.layers.Dense(128, activation=tf.keras.activations.relu)(flat)
+    conv1 = tf.keras.layers.Conv2D(16, kernel_size=(3, 3), activation=tf.keras.activations.relu,strides=1)(image_input)
+    conv2 = tf.keras.layers.Conv2D(32, kernel_size=(3, 3), strides=1, activation='relu')(conv1)
+    pooling = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+    drop1 = tf.keras.layers.Dropout(0.25)(pooling)
+    flat = tf.keras.layers.Flatten()(drop1)
+    conv_dense = tf.keras.layers.Dense(100, activation=tf.keras.activations.relu)(flat)
     
-    action_input = tf.keras.Input(shape=(env.action_space(),))
-    action_dense = tf.keras.layers.Dense(128, activation=tf.keras.activations.relu)(action_input)
+    action_input = tf.keras.Input(shape=(num_actions,))
+    action_dense = tf.keras.layers.Dense(num_actions**2, activation=tf.keras.activations.relu)(action_input)
     
     merged = tf.keras.layers.concatenate([conv_dense, action_dense])
     output = tf.keras.layers.Dense(1,activation=tf.keras.activations.linear)(merged)
@@ -143,11 +148,14 @@ def q_loss(y_true, y_pred):
 
     
 def predict(state,legal_actions = env.legal_actions()):
-    actions = [0,0,0,0,0,0]
-    for i in range(6):
-        action = [0,0,0,0,0,0]
+    actions = [0] * num_actions
+    for i in range(num_actions):
+        action = [0] * num_actions
         action[i] = 1
-        actions[i] = model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0]
+        if image_len == 2:
+            actions[i] = model.predict([np.expand_dims(np.expand_dims(state,2),0),np.expand_dims(action,0)])[0]
+        else:
+            actions[i] = model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0]
     max_index = 0
     for i in range(len(actions)):
         if legal_actions[max_index] == 0 and legal_actions[i] == 1:
@@ -192,7 +200,7 @@ for i in range(iterations):
         targets = list(np.zeros(batch_size))
         for j in range(batch_size):
             a = batch[j,1]
-            onehot = [0,0,0,0,0,0]
+            onehot = [0] * num_actions
             onehot[a] = 1
             actions[j] = onehot
             s = batch[j,0]
@@ -208,6 +216,8 @@ for i in range(iterations):
                 targets[j] = r + gamma * value
         #perform gradient descent w/ batch
         states = np.asarray(states)
+        if image_len == 2:
+            states = np.expand_dims(states,3)
         actions = np.asarray(actions)
         loss = model.train_on_batch(x = [states,actions], y = targets)
         logs = {}
