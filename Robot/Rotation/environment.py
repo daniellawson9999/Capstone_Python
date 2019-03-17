@@ -192,49 +192,71 @@ class Environment():
         return State.STANDARD 
     
     def legal_actions(self):
-        actions = [0,0,0,0,1,1]
         actions = [0] * self.action_space()
+        #abbreviate actions_index_dict to d
+        d = self.actions_index_dict
+        
+        #Set turning to be legal if they are availabe actions
+        if d[Action.CW] != None:
+            actions[d[Action.CW]] = 1
+        if d[Action.CCW] != None:
+            actions[d[Action.CCW]] = 1
+            
         pos,focal = mlab.move()
         v = focal - pos
         v = np.asarray((v[0],v[1]))
         v /= np.linalg.norm(v)
         w = np.asarray((-v[1],v[0]))
         pos = np.asarray((pos[0],pos[1]))
+        
         #left
-        if self.state(*(self.move_distance * w + pos)) != State.ILLEGAL:
-            actions[0] = 1
+        if self.state(*(self.move_distance * w + pos)) != State.ILLEGAL and d[Action.LEFT] != None:
+            actions[d[Action.LEFT]] = 1
         #right
-        if self.state(*(self.move_distance * -w + pos)) != State.ILLEGAL:
-            actions[1] = 1
+        if self.state(*(self.move_distance * -w + pos)) != State.ILLEGAL and d[Action.RIGHT] != None:
+            actions[d[Action.RIGHT]] = 1
         #forwards
-        if self.state(*(self.move_distance * v + pos)) != State.ILLEGAL:
-            actions[2] = 1
+        if self.state(*(self.move_distance * v + pos)) != State.ILLEGAL and d[Action.FORWARDS] != None:
+            actions[d[Action.FORWARDS]] = 1
         #backwards
-        if self.state(*(self.move_distance * -v + pos)) != State.ILLEGAL:
-            actions[3] = 1
+        if self.state(*(self.move_distance * -v + pos)) != State.ILLEGAL and d[Action.BACKWARDS] != None:
+            actions[d[Action.BACKWARDS]] = 1
         return actions
     
     def sample(self):
         actions = self.legal_actions()
         assert 1 in actions, "no legal actions to sample"
-        action = np.random.randint(4)
+        action = np.random.randint(self.action_space())
         while actions[action] == 0:
-            action = np.random.randint(4)
+            action = np.random.randint(self.action_space())
         return action
   
     #visual.box(x=33,y=22,z=1, length=2,height=2,width=2, color = (1,1,0))
     #checks the collision with a mineral at a given x,y. Defaults to the robot x,y
     def step(self,action):
-        #action is a number 0-3
-        assert (action >= 0 and action <= self.action_space() - 1), "action not in action space"
-        #verify action is 
-        assert (self.legal_actions()[action] == 1), "action not legal"
         
-        moves = [0] * self.action_space()
-        if action == 4 or action == 5:
-            moves[action] = self.turn_angle
+        #action is in the action space
+        assert (action >= 0 and action <= self.action_space() - 1), "action not in action space"
+        #verify action is legal
+        assert (self.legal_actions()[action] == 1), "action not legal"
+
+        #left = 0,right = 0,forwards = 0,backwards = 0, pos_angle = 0, neg_angle = 0
+  
+        #get the action which coressponds to the action integer
+        action_name = None
+        for act, index in self.actions_index_dict.items():
+            if index == action:
+                action_name = act
+        #make sure that the action is found
+        assert (action_name != None), "action not found"
+        
+        #create moves list to pass to the move_position function
+        moves = [0] * 6
+        #assign move or turn angle, use the enum value -1 because each enum value is ones based
+        if action_name == Action.CW or action_name == Action.CCW:
+            moves[action_name.value - 1] = self.turn_angle
         else:
-            moves[action] = self.move_distance
+            moves[action_name.value - 1] = self.move_distance
         #store previous position
         previous_pos = mlab.move()[0]
         #transition to new state
