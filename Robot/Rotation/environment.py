@@ -342,13 +342,4 @@ class Environment():
         self.marker_bottom.color = tape_color
         self.marker_top.color = tape_color
         self.init_position()
-        return self.screenshot()
-        
-
-    
-    
-        
-        #also update side color and mineral positions
-    
-    
-        
+        return self.screenshot()    

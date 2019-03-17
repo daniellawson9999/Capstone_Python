@@ -1,4 +1,5 @@
 import environment
+from environment import Action, Reward, Location
 import tensorflow as tf
 import numpy as np
 import collections
@@ -6,13 +7,13 @@ import matplotlib.pyplot as plt
 from time import time
 epsilon = 1
 gamma = .95
-alpha = .0003
+alpha = .0001
 
-iterations = 80
+iterations = 400
 decay_rate = 1/iterations
 test_iterations = 10
-max_moves =  60
-win_reward = max_moves*2
+max_moves =  200
+win_reward = max_moves*5
 loss_reward = -win_reward
 
 
@@ -28,7 +29,7 @@ reward_list = []
 training_win = 0
 training_loss = 0 
 
-env = environment.Environment(random_minerals=False,random_location=False,mineral_location=environment.Location.RIGHT,reward=environment.Reward.PROPORTIONAL,grayscale =True)
+env = environment.Environment(random_minerals=False,random_location=True,mineral_location=Location.RIGHT,reward=Reward.TERMINAL,actions=[Action.FORWARDS,Action.CW,Action.CCW])
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 
@@ -244,6 +245,7 @@ plt.xlabel('episode')
 plt.show()
 #evaluate
 if evaluate_training:
+    env.random_location = False
     for i in range(test_iterations):
         state = env.reset()
         #temp
