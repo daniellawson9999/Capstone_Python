@@ -21,6 +21,7 @@ class Reward(Enum):
     TERMINAL = auto()
     RELATIVE = auto()
     PROPORTIONAL = auto()
+    RELATIVE_PROPORTIONAL = auto()
 
 class Action(Enum):
     LEFT = auto()
@@ -94,7 +95,7 @@ class Environment():
         self.reward = reward
         self.grayscale = grayscale
         self.flat = flat
-        self.actions = actions
+        self.actions = actions.copy()
         self.actions_index_dict = self.get_action_index_dictionary()
         mlab.close(all=True)
         self.width = 900
@@ -287,6 +288,8 @@ class Environment():
                     reward = self.move_reward * 2
             elif self.reward == Reward.PROPORTIONAL:
                 reward = current_distance**2 / -100
+            elif self.reward == Reward.RELATIVE_PROPORTIONAL:
+                reward = previous_distance - current_distance
             else:
                 reward = self.move_reward
                     #reward = self.move_reward

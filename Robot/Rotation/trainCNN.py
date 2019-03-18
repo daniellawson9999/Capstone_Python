@@ -9,16 +9,16 @@ epsilon = 1
 gamma = .95
 alpha = .0001
 
-iterations = 400
+iterations = 200
 decay_rate = 1/iterations
 test_iterations = 10
-max_moves =  200
-win_reward = max_moves*5
+max_moves =  50
+win_reward = 100
 loss_reward = -win_reward
 
 
 max_memory_size = iterations * max_moves
-batch_size = 5
+batch_size = 16
 
 
 wins = 0
@@ -29,7 +29,7 @@ reward_list = []
 training_win = 0
 training_loss = 0 
 
-env = environment.Environment(random_minerals=False,random_location=True,mineral_location=Location.RIGHT,reward=Reward.TERMINAL,actions=[Action.FORWARDS,Action.CW,Action.CCW])
+env = environment.Environment(random_minerals=False,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 
@@ -91,18 +91,24 @@ with tf.device("/GPU:0"):
     
     #state cnn combined with fc action to create a sa convnet
     image_input = tf.keras.Input(shape=image_shape)
-    conv1 = tf.keras.layers.Conv2D(16, kernel_size=(3, 3), activation=tf.keras.activations.relu,strides=1)(image_input)
-    conv2 = tf.keras.layers.Conv2D(32, kernel_size=(3, 3), strides=1, activation='relu')(conv1)
-    pooling = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
-    drop1 = tf.keras.layers.Dropout(0.25)(pooling)
-    flat = tf.keras.layers.Flatten()(drop1)
+    
+    conv1 = tf.keras.layers.Conv2D(32, kernel_size=(5, 5), activation=tf.keras.activations.relu,strides=1)(image_input)
+    pooling1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
+    drop1 = tf.keras.layers.Dropout(.25)(pooling1)
+    
+    conv2 = tf.keras.layers.Conv2D(64, kernel_size=(5, 5), strides=1, activation=tf.keras.activations.relu)(drop1)
+    pooling2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+    drop2 = tf.keras.layers.Dropout(0.25)(pooling2)
+    
+    flat = tf.keras.layers.Flatten()(drop2)
     conv_dense = tf.keras.layers.Dense(100, activation=tf.keras.activations.relu)(flat)
     
     action_input = tf.keras.Input(shape=(num_actions,))
     action_dense = tf.keras.layers.Dense(num_actions**2, activation=tf.keras.activations.relu)(action_input)
     
-    merged = tf.keras.layers.concatenate([conv_dense, action_dense])
-    output = tf.keras.layers.Dense(1,activation=tf.keras.activations.linear)(merged)
+    merged_dense = tf.keras.layers.concatenate([conv_dense, action_dense])
+    dense1 = tf.keras.layers.Dense(10, activation = tf.keras.activations.relu)(merged_dense)
+    output = tf.keras.layers.Dense(1,activation=tf.keras.activations.linear)(dense1)
     
     model = tf.keras.Model(inputs=[image_input,action_input], outputs = output)
     #conv net
@@ -164,8 +170,8 @@ def predict(state,legal_actions = env.legal_actions()):
         if actions[max_index][0] < actions[i][0] and legal_actions[i] == 1:
             max_index = i
     return max_index, actions[max_index][0]
-     
-model.compile(loss = tf.keras.losses.mean_squared_error ,optimizer = tf.keras.optimizers.SGD(lr = alpha))
+
+model.compile(loss = tf.keras.losses.mean_squared_error ,optimizer = tf.keras.optimizers.RMSprop(lr = alpha))
 #tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/tb',batch_size = batch_size)
 tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}'.format(time()),batch_size = batch_size)
 tensorboard.set_model(model)
@@ -220,6 +226,7 @@ for i in range(iterations):
         if image_len == 2:
             states = np.expand_dims(states,3)
         actions = np.asarray(actions)
+        #model.fit()
         loss = model.train_on_batch(x = [states,actions], y = targets)
         logs = {}
         logs['loss'] = loss
@@ -234,7 +241,9 @@ for i in range(iterations):
                 training_loss += 1
             print("total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
             #print("Episode finished after {} timesteps".format(t+1))
-            epsilon -= decay_rate
+            print("epsilon ",epsilon)
+            #decrease epsilon linearlly until .1
+            epsilon = max(epsilon - decay_rate, .1)
             reward_list.append(total_reward/(m+1))
             #print(epsilon)
             break
