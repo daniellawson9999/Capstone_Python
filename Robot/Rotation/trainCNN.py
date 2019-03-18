@@ -29,7 +29,7 @@ reward_list = []
 training_win = 0
 training_loss = 0 
 
-env = environment.Environment(random_minerals=False,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
+env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 
@@ -42,7 +42,7 @@ num_actions = env.action_space()
 
 evaluate_training = True
 save_model = True
-model_name = "fixed-right-fc"
+model_name = "fixed-right-fc.h5"
 
  #based off deque example
 class ReplayMemory():
@@ -263,7 +263,7 @@ if evaluate_training:
         for t in range(max_moves):
             action,value = predict(state,env.legal_actions())
             #action = env.action_space.sample()
-            next_state, reward, done, game_state = env.step(action)
+            state, reward, done, game_state = env.step(action)
             if done:
                 if game_state == environment.State.WIN:
                     wins += 1

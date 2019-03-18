@@ -1,0 +1,1 @@
+env = environment.Environment(random_minerals=False,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
