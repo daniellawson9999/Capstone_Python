@@ -1,0 +1,10 @@
+epsilon = 1
+gamma = .95
+alpha = .0001
+
+iterations = 200
+decay_rate = 1/iterations
+test_iterations = 10
+max_moves =  50
+win_reward = 100
+loss_reward = -win_reward

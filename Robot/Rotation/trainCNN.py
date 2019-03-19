@@ -9,10 +9,10 @@ epsilon = 1
 gamma = .95
 alpha = .0001
 
-iterations = 200
+iterations = 500
 decay_rate = 1/iterations
 test_iterations = 10
-max_moves =  50
+max_moves =  80
 win_reward = 100
 loss_reward = -win_reward
 
@@ -29,7 +29,8 @@ reward_list = []
 training_win = 0
 training_loss = 0 
 
-env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
+#env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
+env = environment.Environment(random_minerals = True,mineral_scale=1,random_location=False,reward=Reward.RELATIVE_PROPORTIONAL,start_shift=-3,camera_height=5,actions=[Action.FORWARDS,Action.CW,Action.CCW])
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 
@@ -42,7 +43,7 @@ num_actions = env.action_space()
 
 evaluate_training = True
 save_model = True
-model_name = "fixed-right-fc.h5"
+model_name = "cnnrandomS2.h5"
 
  #based off deque example
 class ReplayMemory():
@@ -171,9 +172,10 @@ def predict(state,legal_actions = env.legal_actions()):
             max_index = i
     return max_index, actions[max_index][0]
 
-model.compile(loss = tf.keras.losses.mean_squared_error ,optimizer = tf.keras.optimizers.RMSprop(lr = alpha))
+model.compile(loss = tf.keras.losses.mean_squared_error ,optimizer = tf.keras.optimizers.Adam(lr = alpha))
 #tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/tb',batch_size = batch_size)
-tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}'.format(time()),batch_size = batch_size)
+tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}'.format(time()),batch_size = batch_size,   write_grads=True,
+    write_images=True)
 tensorboard.set_model(model)
 
 #begin training

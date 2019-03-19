@@ -1,0 +1,14 @@
+epsilon = 1
+gamma = .95
+alpha = .0001
+
+iterations = 500
+decay_rate = 1/iterations
+test_iterations = 10
+max_moves =  80
+win_reward = 100
+loss_reward = -win_reward
+
+
+max_memory_size = iterations * max_moves
+batch_size = 16

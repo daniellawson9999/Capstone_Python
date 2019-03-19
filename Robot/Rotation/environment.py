@@ -55,8 +55,8 @@ class Environment():
             return self.random_position()
         else:
             #the fixed starting position
-            x = -self.square_width
-            y = -self.square_width
+            x = -self.square_width - self.start_shift
+            y = x
             angle = self.get_pos_angle(x,y)
             return x,y,angle
             
@@ -87,6 +87,7 @@ class Environment():
     
     def __init__(self,random_minerals=True,random_location=True, mineral_location= Location.CENTER,
                  reward = Reward.RELATIVE, grayscale = False, flat = False,
+                 mineral_scale = 1.5, start_shift = 0, camera_height = 4,
                  actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW]):
         
         self.random_minerals = random_minerals
@@ -97,12 +98,15 @@ class Environment():
         self.flat = flat
         self.actions = actions.copy()
         self.actions_index_dict = self.get_action_index_dictionary()
+        self.camera_height = camera_height
+        
         mlab.close(all=True)
         self.width = 900
         self.height = 500
         self.f = mlab.figure(size=(self.width,self.height),bgcolor = (1,1,1))
         self.f.scene._lift()
         self.square_width = 23.5
+        self.start_shift = start_shift
         visual.set_viewer(self.f)  
         a_side = 34.5
         tape_height = .2
@@ -116,7 +120,7 @@ class Environment():
         #get mineral location
         locations = self.get_mineral_locations()
         #self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=4,height=4,width=4, color = (1,1,0))
-        mineral_radius = 2.75 * 1.5
+        mineral_radius = 2.75 * mineral_scale
         self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = (1,1,0) )
         self.silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=mineral_radius,radius =mineral_radius,color = silver)
         self.silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=mineral_radius,radius =mineral_radius,color = silver)
@@ -148,7 +152,7 @@ class Environment():
         #maybe add a z
         rad  = np.deg2rad(self.pos_angle)
         #fp = [self.x-shift*np.sign(np.cos(rad)),self.y-shift*np.sign(np.sin(rad)),0]
-        fp = [self.x-shift*np.cos(rad),self.y-shift*np.sin(rad),4]
+        fp = [self.x-shift*np.cos(rad),self.y-shift*np.sin(rad),self.camera_height]
         #print(fp)
         mlab.view(focalpoint=fp, distance=view_radius, elevation=-90 + angle, azimuth=self.pos_angle)
         mlab.show()
@@ -268,7 +272,7 @@ class Environment():
         game_state = self.state()
         assert (game_state != State.ILLEGAL), "transitioned to an illegal state with action {} and distance".format(action,self.move_distance)
         
-    
+           
         if game_state == State.WIN:
             reward = self.win_reward
             done = True
@@ -277,10 +281,13 @@ class Environment():
             done = True
         else:
             done = False
+            #calculate previous and current distances
             def distance(x1,y1,x2,y2):
                 return np.sqrt((x2-x1)**2 + (y2-y1)**2)
             previous_distance = distance(previous_pos[0],previous_pos[1],self.gold_mineral.x,self.gold_mineral.y)
             current_distance = distance(new_pos[0],new_pos[1],self.gold_mineral.x,self.gold_mineral.y)
+            
+            #use one of the reward structures
             if self.reward == Reward.RELATIVE:
                 if previous_distance > current_distance:
                     reward = self.move_reward
@@ -292,8 +299,9 @@ class Environment():
                 reward = previous_distance - current_distance
             else:
                 reward = self.move_reward
-                    #reward = self.move_reward
-               
+            #also end the game if there are no more legal actions in the new state 
+            if max(self.legal_actions()) == 0:
+               done = True
             
         next_state = self.screenshot()
         

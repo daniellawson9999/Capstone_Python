@@ -3,12 +3,12 @@ from environment import Location,Reward,Action
 import tensorflow as tf
 import numpy as np
 
-test_iterations = 10
-max_moves = 50
+test_iterations = 100
+max_moves = 200
 wins  = 0
 losses = 0
 
-env = environment.Environment(random_minerals=False,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
+env = environment.Environment(random_minerals = True,mineral_scale=1,random_location=False,reward=Reward.RELATIVE_PROPORTIONAL,start_shift=-3,camera_height=5,actions=[Action.FORWARDS,Action.CW,Action.CCW])
 
 num_actions = env.action_space()
 image_shape = np.shape(env.screenshot())
@@ -24,7 +24,7 @@ def q_loss(y_true, y_pred):
 
 with tf.device("/GPU:0"):
     #model = tf.keras.models.load_model('./models/ff1.h5',custom_objects={ 'q_loss': q_loss})
-    model = tf.keras.models.load_model('./models/cnnrandom.h5')
+    model = tf.keras.models.load_model('./models/cnnrandomS1.h5')
     
 def predict(state,legal_actions = env.legal_actions()):
     actions = [0] * num_actions

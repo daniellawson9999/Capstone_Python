@@ -1,0 +1,1 @@
+env = environment.Environment(random_minerals = True,mineral_scale=1,random_location=False,reward=Reward.RELATIVE_PROPORTIONAL,start_shift=-3,camera_height=5,actions=[Action.FORWARDS,Action.CW,Action.CCW])
