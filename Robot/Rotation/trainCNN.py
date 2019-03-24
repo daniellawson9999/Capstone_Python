@@ -5,6 +5,7 @@ import numpy as np
 import collections
 import matplotlib.pyplot as plt
 from time import time
+
 epsilon = 1
 gamma = .95
 alpha = .0001
@@ -43,7 +44,7 @@ num_actions = env.action_space()
 
 evaluate_training = True
 save_model = True
-model_name = "cnnrandomS2.h5"
+model_name = "test.h5"
 
  #based off deque example
 class ReplayMemory():
