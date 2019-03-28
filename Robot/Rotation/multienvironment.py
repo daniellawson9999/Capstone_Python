@@ -118,6 +118,7 @@ class Environment():
         #color for silver
         #silver = (.8,.8,.8)
         silver = (.5,.5,.7)
+        gold = (1,1,0)
         #reate field
         self.floor_3_3 = visual.box(x=0,y=0,z=-1, length = 23.5*3,height = 23.5*3,width = 2,color = (.4,.4,.4))  
         #get mineral location
@@ -127,14 +128,29 @@ class Environment():
         
         self.mineral_list = []
         
-        if self.standard_mineral_position:
-            self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = (1,1,0) )
-            self.gold_mineral.type = 
+        
+        if self.standard_mineral_positions:
+            self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = gold )
+            #self.gold_mineral.type = 
             self.silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=mineral_radius,radius =mineral_radius,color = silver)
             self.silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=mineral_radius,radius =mineral_radius,color = silver)
         else:
-            a=2
-            a+=1
+            for i in range(3):
+                for j in range(3):
+                    y = self.square_width * (1-i)
+                    x = self.square_width * (1-j)
+                    if x == 0 and y == 0:
+                        continue
+                    if np.random.randint(2):
+                        t = Mineral.GOLD
+                        color =gold
+                    else:
+                        t = Mineral.SILVER
+                        color= silver
+                    mineral = visual.sphere(x=x,y=y,z=mineral_radius,radius=mineral_radius,color=color)
+                    mineral.type = t
+                    mineral.collected = False
+                    self.mineral_list.append(mineral)
         #randomly pick the red or blue side
         r = np.round(np.random.random(1)[0])
         b = 1 - r

@@ -88,7 +88,8 @@ class Environment():
     def __init__(self,random_minerals=True,random_location=True, mineral_location= Location.CENTER,
                  reward = Reward.RELATIVE, grayscale = False, flat = False,
                  mineral_scale = 1.5, start_shift = 0, camera_height = 4,
-                 actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW]):
+                 actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW],
+                 decorations = False, camera_tilt =  0):
         
         self.random_minerals = random_minerals
         self.random_location = random_location
@@ -99,6 +100,8 @@ class Environment():
         self.actions = actions.copy()
         self.actions_index_dict = self.get_action_index_dictionary()
         self.camera_height = camera_height
+        self.decorations = decorations
+        self.camera_tilt = camera_tilt
         
         mlab.close(all=True)
         self.width = 900
@@ -119,9 +122,9 @@ class Environment():
         self.floor_3_3 = visual.box(x=0,y=0,z=-1, length = 23.5*3,height = 23.5*3,width = 2,color = (.4,.4,.4))  
         #get mineral location
         locations = self.get_mineral_locations()
-        self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=4,height=4,width=4, color = (1,1,0))
+        #self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=4,height=4,width=4, color = (1,1,0))
         mineral_radius = 2.75 * mineral_scale
-        #self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = (1,1,0) )
+        self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = (1,1,0) )
         self.silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=mineral_radius,radius =mineral_radius,color = silver)
         self.silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=mineral_radius,radius =mineral_radius,color = silver)
 
@@ -139,13 +142,29 @@ class Environment():
         self.marker_bottom = visual.box(x=self.square_width,y=self.square_width/2 + 1, z = tape_height,length=self.square_width,height=2,width=tape_height,color=tape_color)
         self.marker_top = visual.box(x=self.square_width,y=3*self.square_width/2 - 1, z = tape_height,length=self.square_width,height=2,width=tape_height,color=tape_color)
 
+        #add bars
+        if self.decorations:
+            bar_width = 1.5
+            bar_height = 2
+            bar_length = self.square_width * 3
+            bar_color = (0,0,0)
+            self.bar1 = visual.box(x=self.square_width*1.5-bar_width/2,y=0,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar1.rotate(90,axis=[0,0,1],origin=self.bar1.pos)
+            
+            
+            self.bar2 = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar2.rotate(90,axis=[0,0,1],origin=self.bar2.pos)
+            
+            self.bar3 = visual.box(x=0,y=self.square_width*1.5-bar_width/2,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            
+            self.bar4 = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
         
         self.x, self.y, self.pos_angle = self.get_start_position()
         self.init_position()
         self.move_distance = 2
         self.turn_angle = 5
     def init_position(self):
-        angle = 0
+        angle = self.camera_tilt
         angle_r = angle * np.pi / 180
         view_distance = self.square_width * np.sqrt(2)
         shift = view_distance / np.sqrt(2)

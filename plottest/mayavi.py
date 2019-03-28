@@ -14,9 +14,11 @@ mlab.test_plot3d()
 
 # Even sillier animation.
 b1 = visual.box()
-b2 = visual.box(x=4., color=())
-b3 = visual.box(x=-4, color=visual.color.red)
+
+b2 = visual.box(x=4., color=(0,0,1))
+b3 = visual.box(x=-4, color=(1,1,0))
 b1.v = 5.0
+b1._pos_changed()
 
 @mlab.show
 @mlab.animate(delay=250)
