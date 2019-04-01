@@ -55,7 +55,7 @@ class Environment():
             return self.random_position()
         else:
             #the fixed starting position
-            x = -self.square_width - self.start_shift
+            x = self.start_pos - self.start_shift
             y = x
             angle = self.get_pos_angle(x,y)
             return x,y,angle
@@ -89,7 +89,7 @@ class Environment():
                  reward = Reward.RELATIVE, grayscale = False, flat = False,
                  mineral_scale = 1.5, start_shift = 0, camera_height = 4,
                  actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW],
-                 decorations = False, camera_tilt =  0):
+                 decorations = False, camera_tilt =  0,start_pos=-23.5):
         
         self.random_minerals = random_minerals
         self.random_location = random_location
@@ -102,6 +102,7 @@ class Environment():
         self.camera_height = camera_height
         self.decorations = decorations
         self.camera_tilt = camera_tilt
+        self.start_pos = start_pos
         
         mlab.close(all=True)
         self.width = 900
@@ -110,6 +111,7 @@ class Environment():
         self.f.scene._lift()
         self.square_width = 23.5
         self.start_shift = start_shift
+        
         visual.set_viewer(self.f)  
         a_side = 34.5
         tape_height = .2

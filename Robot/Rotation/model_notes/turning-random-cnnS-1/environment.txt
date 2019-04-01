@@ -1,1 +1,6 @@
 env = environment.Environment(random_minerals = True,mineral_scale=1,random_location=False,reward=Reward.RELATIVE_PROPORTIONAL,start_shift=-3,camera_height=5,actions=[Action.FORWARDS,Action.CW,Action.CCW])
+
+if minerals really do have a radius of 2.75, then need to lower the camera and start the robot further back
+
+try this:
+Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT],mineral_scale=.5,camera_height=3,camera_tilt=0,start_shift=15,start_pos=23.5)

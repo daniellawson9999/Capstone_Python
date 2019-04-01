@@ -174,6 +174,7 @@ def predict(state,legal_actions = env.legal_actions()):
     return max_index, actions[max_index][0]
 
 model.compile(loss = tf.keras.losses.mean_squared_error ,optimizer = tf.keras.optimizers.Adam(lr = alpha))
+
 #tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/tb',batch_size = batch_size)
 tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}'.format(time()),batch_size = batch_size,   write_grads=True,
     write_images=True)
