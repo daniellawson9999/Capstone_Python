@@ -5,6 +5,9 @@ import tvtk.tools
 import matplotlib.pyplot as plt
 from PIL import Image
 from enum import Enum,auto
+import copy
+
+
 
 class State(Enum):
     WIN = auto()
@@ -89,7 +92,8 @@ class Environment():
                  reward = Reward.RELATIVE, grayscale = False, flat = False,
                  mineral_scale = 1.5, start_shift = 0, camera_height = 4,
                  actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW],
-                 decorations = False, camera_tilt =  0,start_pos=-23.5):
+                 decorations = False, camera_tilt =  0,start_pos=-23.5,
+                 width = 900, height = (500-46),resize_scale=15):
         
         self.random_minerals = random_minerals
         self.random_location = random_location
@@ -103,10 +107,10 @@ class Environment():
         self.decorations = decorations
         self.camera_tilt = camera_tilt
         self.start_pos = start_pos
-        
+        self.resize_scale = resize_scale
         mlab.close(all=True)
-        self.width = 900
-        self.height = 500
+        self.width = width
+        self.height = height + 46
         self.f = mlab.figure(size=(self.width,self.height),bgcolor = (1,1,1))
         self.f.scene._lift()
         self.square_width = 23.5
@@ -120,8 +124,9 @@ class Environment():
         #color for silver
         #silver = (.8,.8,.8)
         silver = (.5,.5,.7)
+        floor_color = (.4,.4,.4)
         #reate field
-        self.floor_3_3 = visual.box(x=0,y=0,z=-1, length = 23.5*3,height = 23.5*3,width = 2,color = (.4,.4,.4))  
+        self.floor_3_3 = visual.box(x=0,y=0,z=-1, length = 23.5*3,height = 23.5*3,width = 2,color = floor_color)  
         #get mineral location
         locations = self.get_mineral_locations()
         #self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=4,height=4,width=4, color = (1,1,0))
@@ -147,20 +152,45 @@ class Environment():
         #add bars
         if self.decorations:
             bar_width = 1.5
-            bar_height = 2
+            bar_height = 1
+            middle_height = 12 - bar_height*2
+            middle_color = floor_color
             bar_length = self.square_width * 3
             bar_color = (0,0,0)
             self.bar1 = visual.box(x=self.square_width*1.5-bar_width/2,y=0,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
             self.bar1.rotate(90,axis=[0,0,1],origin=self.bar1.pos)
             
+            self.bar1m = visual.box(x=self.square_width*1.5-bar_width/2,y=0,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
+            self.bar1m.rotate(90,axis=[0,0,1],origin=self.bar1m.pos)
+            
+            self.bar1t = visual.box(x=self.square_width*1.5-bar_width/2,y=0,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar1t.rotate(90,axis=[0,0,1],origin=self.bar1t.pos)
+
             
             self.bar2 = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
             self.bar2.rotate(90,axis=[0,0,1],origin=self.bar2.pos)
             
+            #self.bar2m = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
+            #self.bar2m.rotate(90,axis=[0,0,1],origin=self.bar2m.pos)
+            
+            self.bar2t = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar2t.rotate(90,axis=[0,0,1],origin=self.bar2t.pos)
+            
+            
+            
             self.bar3 = visual.box(x=0,y=self.square_width*1.5-bar_width/2,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
             
+            self.bar3m = visual.box(x=0,y=self.square_width*1.5-bar_width/2,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
+
+            self.bar3t = visual.box(x=0,y=self.square_width*1.5-bar_width/2,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+
+            
             self.bar4 = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
-        
+            
+            #self.bar4m = visual.box(x=0,y=-self.square_width*1.5-bar_width/2,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
+
+            self.bar4t = visual.box(x=0,y=-self.square_width*1.5-bar_width/2,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            
         self.x, self.y, self.pos_angle = self.get_start_position()
         self.init_position()
         self.move_distance = 2
@@ -333,7 +363,7 @@ class Environment():
         img = Image.fromarray(shot)
         if self.grayscale:
             img = img.convert('L')
-        scale = 15
+        scale = self.resize_scale
         resized = img.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
         return resized
         #resized.save('test{}.png'.format(n))

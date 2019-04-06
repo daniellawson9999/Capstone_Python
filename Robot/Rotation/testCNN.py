@@ -8,23 +8,19 @@ max_moves = 200
 wins  = 0
 losses = 0
 delay = 500
-env = environment.Environment(random_minerals = True,mineral_scale=1,random_location=False,reward=Reward.RELATIVE_PROPORTIONAL,start_shift=-3,camera_height=5,actions=[Action.FORWARDS,Action.CW,Action.CCW])
+env = environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=2.5,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16)
 
 num_actions = env.action_space()
 image_shape = np.shape(env.screenshot())
 image_len = len(image_shape)
+
+#no longer used, but older models may have loss set as q_loss
 def q_loss(y_true, y_pred):
-    #y_true = Q(s), y_pred = y
-   # y_true = tf.keras.backend.placeholder(ndim = 1, dtype = 'float32', name = 'y_true')
-    #y_pred = tf.keras.backend.placeholder(ndim = 2, dtype = 'float32', name = 'y_pred')
-    #q = tf.keras.backend.max(y_pred)
     return tf.keras.backend.mean(tf.keras.backend.square(y_true-y_pred))
-    #return tf.math.reduce_sum(tf.math.squared_difference(y_true,y_pred)) / 2
-#np.argmax(model.predict(np.expand_dims(state,0))) 
 
 with tf.device("/GPU:0"):
     #model = tf.keras.models.load_model('./models/ff1.h5',custom_objects={ 'q_loss': q_loss})
-    model = tf.keras.models.load_model('./models/cnnrandomS1.h5')
+    model = tf.keras.models.load_model('./models/test.h5')
 
     
 def predict(state,legal_actions = env.legal_actions()):
