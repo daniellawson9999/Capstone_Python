@@ -10,11 +10,11 @@ epsilon = 1
 gamma = .95
 alpha = .0001
 
-iterations = 300
+iterations = 400
 decay_rate = 1/iterations
 test_iterations = 10
 max_moves =  80
-win_reward = 100
+win_reward = 100 
 loss_reward = -win_reward
 
 
@@ -31,7 +31,7 @@ training_win = 0
 training_loss = 0 
 
 #env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
-env = environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16)
+env = environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16,x_collision_scale=3,y_collision_scale=3)
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 

@@ -93,7 +93,7 @@ class Environment():
                  mineral_scale = 1.5, start_shift = 0, camera_height = 4,
                  actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW],
                  decorations = False, camera_tilt =  0,start_pos=-23.5,
-                 width = 900, height = (500-46),resize_scale=15):
+                 width = 900, height = (500-46),resize_scale=15,x_collision_scale = 1,y_collision_scale = 1):
         
         self.random_minerals = random_minerals
         self.random_location = random_location
@@ -115,7 +115,9 @@ class Environment():
         self.f.scene._lift()
         self.square_width = 23.5
         self.start_shift = start_shift
-        
+        self.x_collision_scale = x_collision_scale
+        self.y_collision_scale = y_collision_scale
+
         visual.set_viewer(self.f)  
         a_side = 34.5
         tape_height = .2
@@ -170,8 +172,8 @@ class Environment():
             self.bar2 = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
             self.bar2.rotate(90,axis=[0,0,1],origin=self.bar2.pos)
             
-            #self.bar2m = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
-            #self.bar2m.rotate(90,axis=[0,0,1],origin=self.bar2m.pos)
+            self.bar2m = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
+            self.bar2m.rotate(90,axis=[0,0,1],origin=self.bar2m.pos)
             
             self.bar2t = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
             self.bar2t.rotate(90,axis=[0,0,1],origin=self.bar2t.pos)
@@ -187,9 +189,9 @@ class Environment():
             
             self.bar4 = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
             
-            #self.bar4m = visual.box(x=0,y=-self.square_width*1.5-bar_width/2,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
+            self.bar4m = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
 
-            self.bar4t = visual.box(x=0,y=-self.square_width*1.5-bar_width/2,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar4t = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
             
         self.x, self.y, self.pos_angle = self.get_start_position()
         self.init_position()
@@ -227,7 +229,7 @@ class Environment():
         else:
             rad = mineral.radius
         rad *= 1.2
-        if x <= mineral.x + rad and x >= mineral.x - rad and y <= mineral.y + rad and y >= mineral.y - rad:
+        if x <= mineral.x + rad * self.x_collision_scale and x >= mineral.x - rad * self.x_collision_scale  and y <= mineral.y + rad *self.y_collision_scale and y >= mineral.y - rad * self.y_collision_scale:
             return True
         return False
     #returns an array of legal actions (ie [1,1,1,0])

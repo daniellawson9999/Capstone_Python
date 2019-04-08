@@ -3,12 +3,12 @@ from environment import Location,Reward,Action
 import tensorflow as tf
 import numpy as np
 
-test_iterations = 100
+test_iterations = 20
 max_moves = 200
 wins  = 0
 losses = 0
 delay = 500
-env = environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=2.5,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16)
+env = environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16,x_collision_scale=3,y_collision_scale=3)
 
 num_actions = env.action_space()
 image_shape = np.shape(env.screenshot())
