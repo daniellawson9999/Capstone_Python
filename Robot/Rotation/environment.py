@@ -379,6 +379,7 @@ class Environment():
             array = np.asarray(resized)
         array = array / 255
     
+    
         #array = np.asarray(resized)
         #np.shape(img) for dimensions
         return array
