@@ -20,7 +20,7 @@ def q_loss(y_true, y_pred):
 
 with tf.device("/GPU:0"):
     #model = tf.keras.models.load_model('./models/ff1.h5',custom_objects={ 'q_loss': q_loss})
-    model = tf.keras.models.load_model('./models/test.h5')
+    model = tf.keras.models.load_model('./models/cnnrandomP1.h5')
 
     
 def predict(state,legal_actions = env.legal_actions()):

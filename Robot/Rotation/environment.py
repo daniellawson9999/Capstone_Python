@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from enum import Enum,auto
 import copy
+import cv2
 
 
 
@@ -93,7 +94,8 @@ class Environment():
                  mineral_scale = 1.5, start_shift = 0, camera_height = 4,
                  actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW],
                  decorations = False, camera_tilt =  0,start_pos=-23.5,
-                 width = 900, height = (500-46),resize_scale=15,x_collision_scale = 1,y_collision_scale = 1):
+                 width = 900, height = (500-46),resize_scale=15,
+                 x_collision_scale = 1,y_collision_scale = 1,k=5,silver=(.5,.5,.7), random_color = False):
         
         self.random_minerals = random_minerals
         self.random_location = random_location
@@ -117,7 +119,28 @@ class Environment():
         self.start_shift = start_shift
         self.x_collision_scale = x_collision_scale
         self.y_collision_scale = y_collision_scale
-
+        self.k = k
+        self.k_max_iterations = 10
+        self.silver = silver
+        self.random_color = random_color
+        
+        self.color_list = {
+            'black':,
+            'white':,
+            'red':,
+            'lime',
+            'blue':,
+            'yellow':,
+            'cyan':,
+            'magenta':,
+            'silver':,
+            'gray':,
+            'maroon':,
+            'olive':,
+            'green':,
+            'teal':,
+            'navy':
+        }
         visual.set_viewer(self.f)  
         a_side = 34.5
         tape_height = .2
@@ -125,7 +148,6 @@ class Environment():
         self.d = 14.5 / np.sqrt(2)
         #color for silver
         #silver = (.8,.8,.8)
-        silver = (.5,.5,.7)
         floor_color = (.4,.4,.4)
         #reate field
         self.floor_3_3 = visual.box(x=0,y=0,z=-1, length = 23.5*3,height = 23.5*3,width = 2,color = floor_color)  
@@ -134,8 +156,8 @@ class Environment():
         #self.gold_mineral = visual.box(x=locations[0][0],y=locations[0][1],z=1, length=4,height=4,width=4, color = (1,1,0))
         mineral_radius = 2.75 * mineral_scale
         self.gold_mineral = visual.sphere(x=locations[0][0],y=locations[0][1],z=mineral_radius,radius =mineral_radius,color = (1,1,0) )
-        self.silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=mineral_radius,radius =mineral_radius,color = silver)
-        self.silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=mineral_radius,radius =mineral_radius,color = silver)
+        self.silver_mineral_1 = visual.sphere(x=locations[1][0],y=locations[1][1],z=mineral_radius,radius =mineral_radius,color = self.silver)
+        self.silver_mineral_2 = visual.sphere(x=locations[2][0],y=locations[2][1],z=mineral_radius,radius =mineral_radius,color = self.silver)
 
         #randomly pick the red or blue side
         r = np.round(np.random.random(1)[0])
@@ -143,6 +165,7 @@ class Environment():
         tape_color = (r,0,b)
         #23.5 is the diameter of a square
         #place the crater tape
+        
         self.vertical_lander_tape = visual.box(x=-self.square_width*3/2 + 1,y=a_side/2 - self.square_width*3/2,z=tape_height,length = 2, height = a_side, width = tape_height,color=tape_color)
         self.h_lander_tape = visual.box(x=-self.square_width*3/2 + a_side/2,y=-a_side/2,z=tape_height,length = 2, height = a_side * np.sqrt(2), width = tape_height,color=tape_color)
         self.h_lander_tape.rotate(45,axis = [0,0,1],origin = [self.h_lander_tape.x,self.h_lander_tape.y,self.h_lander_tape.z])
@@ -289,7 +312,7 @@ class Environment():
         while actions[action] == 0:
             action = np.random.randint(self.action_space())
         return action
-  
+    
     #visual.box(x=33,y=22,z=1, length=2,height=2,width=2, color = (1,1,0))
     #checks the collision with a mineral at a given x,y. Defaults to the robot x,y
     def step(self,action):
@@ -368,6 +391,7 @@ class Environment():
         scale = self.resize_scale
         resized = img.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
         return resized
+    
         #resized.save('test{}.png'.format(n))
     def screenshot(self):
         resized = self.sample_image()
@@ -378,6 +402,44 @@ class Environment():
         else:
             array = np.asarray(resized)
         array = array / 255
+        return array;
+        
+    
+    def segmented_image(self, array):
+        original_shape = array.shape
+        array = array.reshape((-1,3))
+        array = np.float32(array)
+        
+        #kmeans code follows the form of the opencv docs
+        max_iterations = self.k_max_iterations
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, max_iterations,1.0)
+        ret,label,center=cv2.kmeans(array,self.k,None,criteria,max_iterations,cv2.KMEANS_PP_CENTERS )
+        
+        center = np.uint8(center)
+        res = center[label.flatten()]
+        reshaped = res.reshape((original_shape))
+        
+        return reshaped
+    
+    
+    def display_segmented_image(self,array):
+        img = Image.fromarray(self.segmented_image(array))
+        return img
+    
+    def display_resized_image(self, array):
+        array  = self.segmented_image(array)
+        img = Image.fromarray(array)
+        scale = self.resize_scale
+        resized_img = img.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
+        return resized_img
+    
+    def screenshot_opencv(self):
+        img = self.display_resized_image(mlab.screenshot())
+        array = np.asarray(img)
+        array = array / 255
+        return array
+        
+        
     
     
         #array = np.asarray(resized)
