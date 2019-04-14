@@ -95,7 +95,7 @@ class Environment():
                  actions = [Action.LEFT,Action.RIGHT,Action.FORWARDS,Action.BACKWARDS,Action.CW,Action.CCW],
                  decorations = False, camera_tilt =  0,start_pos=-23.5,
                  width = 900, height = (500-46),resize_scale=15,
-                 x_collision_scale = 1,y_collision_scale = 1,k=5,silver=(.5,.5,.7), random_color = False):
+                 x_collision_scale = 1,y_collision_scale = 1,k=5,silver=(.5,.5,.7), random_colors = False,random_lighting=False):
         
         self.random_minerals = random_minerals
         self.random_location = random_location
@@ -114,6 +114,7 @@ class Environment():
         self.width = width
         self.height = height + 46
         self.f = mlab.figure(size=(self.width,self.height),bgcolor = (1,1,1))
+        
         self.f.scene._lift()
         self.square_width = 23.5
         self.start_shift = start_shift
@@ -122,25 +123,8 @@ class Environment():
         self.k = k
         self.k_max_iterations = 10
         self.silver = silver
-        self.random_color = random_color
-        
-        self.color_list = {
-            'black':,
-            'white':,
-            'red':,
-            'lime',
-            'blue':,
-            'yellow':,
-            'cyan':,
-            'magenta':,
-            'silver':,
-            'gray':,
-            'maroon':,
-            'olive':,
-            'green':,
-            'teal':,
-            'navy':
-        }
+        self.random_colors = random_colors
+        self.random_lighting = random_lighting
         visual.set_viewer(self.f)  
         a_side = 34.5
         tape_height = .2
@@ -188,7 +172,7 @@ class Environment():
             self.bar1m = visual.box(x=self.square_width*1.5-bar_width/2,y=0,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
             self.bar1m.rotate(90,axis=[0,0,1],origin=self.bar1m.pos)
             
-            self.bar1t = visual.box(x=self.square_width*1.5-bar_width/2,y=0,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar1t = visual.box(x=self.square_width*1.5-bar_width/2,y=0,z=bar_height+middle_height, width= bar_height, height=bar_width,length=bar_length, color = bar_color)
             self.bar1t.rotate(90,axis=[0,0,1],origin=self.bar1t.pos)
 
             
@@ -198,7 +182,7 @@ class Environment():
             self.bar2m = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
             self.bar2m.rotate(90,axis=[0,0,1],origin=self.bar2m.pos)
             
-            self.bar2t = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar2t = visual.box(x=-self.square_width*1.5+bar_width/2,y=0,z=bar_height+middle_height, width= bar_height, height=bar_width,length=bar_length, color = bar_color)
             self.bar2t.rotate(90,axis=[0,0,1],origin=self.bar2t.pos)
             
             
@@ -207,19 +191,86 @@ class Environment():
             
             self.bar3m = visual.box(x=0,y=self.square_width*1.5-bar_width/2,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
 
-            self.bar3t = visual.box(x=0,y=self.square_width*1.5-bar_width/2,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar3t = visual.box(x=0,y=self.square_width*1.5-bar_width/2,z=bar_height+middle_height, width= bar_height, height=bar_width,length=bar_length, color = bar_color)
 
             
             self.bar4 = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=tape_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
             
             self.bar4m = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=bar_height+middle_height/2, width= middle_height, height=bar_width,length=bar_length, color = middle_color)
 
-            self.bar4t = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=bar_height+middle_height, width= bar_width, height=bar_height,length=bar_length, color = bar_color)
+            self.bar4t = visual.box(x=0,y=-self.square_width*1.5+bar_width/2,z=bar_height+middle_height, width= bar_height, height=bar_width,length=bar_length, color = bar_color)
+            
+            if self.random_colors:
+                height_scale = 40
+                new_height =  bar_height * height_scale
+                self.bar1t.width= new_height
+                self.bar1t.rotate(90,axis=[0,0,1],origin=self.bar1t.pos)
+                self.bar2t.width= new_height
+                self.bar2t.rotate(90,axis=[0,0,1],origin=self.bar2t.pos)
+                self.bar3t.width = new_height
+                self.bar4t.width = new_height
+                
+                self.randomize_colors()
+                
+                
             
         self.x, self.y, self.pos_angle = self.get_start_position()
         self.init_position()
+        if self.random_lighting:
+            self.randomize_lighting()
         self.move_distance = 2
         self.turn_angle = 5
+    #from colorsys library source code
+    def hsv_to_rgb(self,h, s, v):
+        if s == 0.0:
+            return v, v, v
+        i = int(h*6.0) # XXX assume int() truncates!
+        f = (h*6.0) - i
+        p = v*(1.0 - s)
+        q = v*(1.0 - s*f)
+        t = v*(1.0 - s*(1.0-f))
+        i = i%6
+        if i == 0:
+            return v, t, p
+        if i == 1:
+            return q, v, p
+        if i == 2:
+            return p, v, t
+        if i == 3:
+            return p, q, v
+        if i == 4:
+            return t, p, v
+        if i == 5:
+            return v, p, q
+        # Cannot get here
+    def randomize_colors(self):
+        r = np.round(np.random.random(1)[0])
+        b = 1 - r
+        tape_color = (r,0,b)
+        if (self.random_colors):
+            #change this to a randomly generated color
+            min_value = 10
+            random_value = (np.random.randint(100-min_value) + min_value) / 100
+            min_saturation = 25
+            random_saturation = (np.random.randint(100-min_saturation) + min_saturation) / 100
+            hue_yellow = [30,75]
+            random_hue = np.random.choice(np.concatenate((np.arange(hue_yellow[0]),np.arange(360-hue_yellow[1])+hue_yellow[1]+1))) / 360
+            color = self.hsv_to_rgb(random_hue,random_saturation,random_value)
+            objects = [self.floor_3_3,self.bar1,self.bar2,self.bar3,self.bar4,self.bar1m,self.bar2m,self.bar3m,self.bar4m,self.bar1t,self.bar2t,self.bar3t,self.bar4t]
+            for o in objects:
+                o.color = color
+            if np.round(np.random.random(1)[0]):
+                tape_color = color
+        
+        self.vertical_lander_tape.color = tape_color
+        self.h_lander_tape.color = tape_color
+        self.marker_left.color = tape_color
+        self.marker_right.color = tape_color
+        self.marker_bottom.color = tape_color
+        self.marker_top.color = tape_color
+    def randomize_lighting(self):
+        for i in range(3):
+            self.f.scene.light_manager.lights[i].intensity = np.random.rand() / 2 + .5
     def init_position(self):
         angle = self.camera_tilt
         angle_r = angle * np.pi / 180
@@ -404,7 +455,7 @@ class Environment():
         array = array / 255
         return array;
         
-    
+    #segmented image through screenshot_segmented implements k means clustering for image segmentation.
     def segmented_image(self, array):
         original_shape = array.shape
         array = array.reshape((-1,3))
@@ -433,7 +484,7 @@ class Environment():
         resized_img = img.resize((round(np.shape(img)[1] / scale), round(np.shape(img)[0] / scale)), Image.ANTIALIAS)
         return resized_img
     
-    def screenshot_opencv(self):
+    def screenshot_segmented(self):
         img = self.display_resized_image(mlab.screenshot())
         array = np.asarray(img)
         array = array / 255
@@ -446,7 +497,7 @@ class Environment():
         #np.shape(img) for dimensions
         return array
  
-        
+   
     def reset(self):
         #shuffle minerals
         locations = self.get_mineral_locations()
@@ -460,15 +511,10 @@ class Environment():
         
         self.x, self.y, self.pos_angle = self.get_start_position()
         
-        r = np.round(np.random.random(1)[0])
-        b = 1 - r
-        tape_color = (r,0,b)
+        self.randomize_colors()
         
-        self.vertical_lander_tape.color = tape_color
-        self.h_lander_tape.color = tape_color
-        self.marker_left.color = tape_color
-        self.marker_right.color = tape_color
-        self.marker_bottom.color = tape_color
-        self.marker_top.color = tape_color
+        if self.random_lighting:
+            self.randomize_lighting()
+        
         self.init_position()
         return self.screenshot()    
