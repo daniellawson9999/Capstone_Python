@@ -10,7 +10,7 @@ epsilon = 1
 gamma = .95
 alpha = .0001
 
-iterations = 400
+iterations = 700
 decay_rate = 1/iterations
 test_iterations = 10
 max_moves =  80
@@ -28,10 +28,18 @@ reached_max = 0
 reward_list = []
 
 training_win = 0
-training_loss = 0 
+training_loss = 0
+
+load_model = False
+load_name = 'cnnrandomP1.h5' 
 
 #env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
-env = environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16,x_collision_scale=3,y_collision_scale=3)
+env= environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,
+                             camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,
+                             actions=[Action.FORWARDS,Action.CW,Action.CCW],
+                             reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,
+                             resize_scale=16,x_collision_scale=3,y_collision_scale=3,
+                             silver=(.8,.8,.8),random_colors=True,random_lighting=True)
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 
@@ -80,7 +88,9 @@ while len(memory.memory) < batch_size:
 
 #q network
 
-
+#legacy
+def q_loss(y_true, y_pred):
+    return tf.keras.backend.mean(tf.keras.backend.square(y_true-y_pred))
 #define the nn structure
 with tf.device("/GPU:0"):
     #fc nn
@@ -90,29 +100,33 @@ with tf.device("/GPU:0"):
     #hidden2 = tf.keras.layers.Dense(int(np.round(np.product(image_shape[0])/30)), activation= tf.keras.activations.relu)(hidden1)
     #outputs= tf.keras.layers.Dense(1, activation= tf.keras.activations.linear)(hidden2)
     #model =  tf.keras.Model(inputs=inputs, outputs=outputs)
-    
+    if load_model:
+        model = tf.keras.models.load_model('./models/cnnrandomP1.h5')
     #state cnn combined with fc action to create a sa convnet
-    image_input = tf.keras.Input(shape=image_shape)
-    
-    conv1 = tf.keras.layers.Conv2D(32, kernel_size=(5, 5), activation=tf.keras.activations.relu,strides=1)(image_input)
-    pooling1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
-    drop1 = tf.keras.layers.Dropout(.25)(pooling1)
-    
-    conv2 = tf.keras.layers.Conv2D(64, kernel_size=(5, 5), strides=1, activation=tf.keras.activations.relu)(drop1)
-    pooling2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
-    drop2 = tf.keras.layers.Dropout(0.25)(pooling2)
-    
-    flat = tf.keras.layers.Flatten()(drop2)
-    conv_dense = tf.keras.layers.Dense(100, activation=tf.keras.activations.relu)(flat)
-    
-    action_input = tf.keras.Input(shape=(num_actions,))
-    action_dense = tf.keras.layers.Dense(num_actions**2, activation=tf.keras.activations.relu)(action_input)
-    
-    merged_dense = tf.keras.layers.concatenate([conv_dense, action_dense])
-    dense1 = tf.keras.layers.Dense(10, activation = tf.keras.activations.relu)(merged_dense)
-    output = tf.keras.layers.Dense(1,activation=tf.keras.activations.linear)(dense1)
-    
-    model = tf.keras.Model(inputs=[image_input,action_input], outputs = output)
+    else:
+        image_input = tf.keras.Input(shape=image_shape)
+        
+        conv1 = tf.keras.layers.Conv2D(32, kernel_size=(5, 5), activation=tf.keras.activations.relu,strides=1)(image_input)
+        pooling1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
+        drop1 = tf.keras.layers.Dropout(.25)(pooling1)
+        
+        conv2 = tf.keras.layers.Conv2D(64, kernel_size=(5, 5), strides=1, activation=tf.keras.activations.relu)(drop1)
+        pooling2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+        drop2 = tf.keras.layers.Dropout(0.25)(pooling2)
+        
+        flat = tf.keras.layers.Flatten()(drop2)
+        conv_dense = tf.keras.layers.Dense(100, activation=tf.keras.activations.relu)(flat)
+        
+        action_input = tf.keras.Input(shape=(num_actions,))
+        action_dense = tf.keras.layers.Dense(num_actions**2, activation=tf.keras.activations.relu)(action_input)
+        
+        merged_dense = tf.keras.layers.concatenate([conv_dense, action_dense])
+        dense1 = tf.keras.layers.Dense(10, activation = tf.keras.activations.relu)(merged_dense)
+        output = tf.keras.layers.Dense(1,activation=tf.keras.activations.linear)(dense1)
+        
+        model = tf.keras.Model(inputs=[image_input,action_input], outputs = output)
+        model.compile(loss = tf.keras.losses.mean_squared_error ,optimizer = tf.keras.optimizers.Adam(lr = alpha))
+
     #conv net
     #model = tf.keras.Sequential()
     #model.add(tf.keras.layers.Conv2D(16, kernel_size=(3, 3), activation=tf.keras.activations.relu, input_shape=image_shape,strides=2))
@@ -145,15 +159,6 @@ with tf.device("/GPU:0"):
 #        return tf.keras.squa  (y - max(model.predict(state)))**2 # (y- max(Q(s)))^2
 #    return loss;  
 
-def q_loss(y_true, y_pred):
-    #y_true and y_pred are both full batch size (20x6 and)
-    #y_true = Q(s), y_pred = y
-   # y_true = tf.keras.backend.placeholder(ndim = 1, dtype = 'float32', name = 'y_true')
-    #y_pred = tf.keras.backend.placeholder(ndim = 2, dtype = 'float32', name = 'y_pred')
-    #q = tf.keras.backend.max(y_pred)
-    return tf.keras.backend.mean(tf.keras.backend.square(y_true-y_pred))
-    #return tf.math.reduce_sum(tf.math.squared_difference(y_true,y_pred)) / 2
-#np.argmax(model.predict(np.expand_dims(state,0))) 
 
     
 def predict(state,legal_actions = env.legal_actions()):
@@ -172,8 +177,6 @@ def predict(state,legal_actions = env.legal_actions()):
         if actions[max_index][0] < actions[i][0] and legal_actions[i] == 1:
             max_index = i
     return max_index, actions[max_index][0]
-
-model.compile(loss = tf.keras.losses.mean_squared_error ,optimizer = tf.keras.optimizers.Adam(lr = alpha))
 
 #tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/tb',batch_size = batch_size)
 tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}'.format(time()),batch_size = batch_size,   write_grads=True,

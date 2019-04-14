@@ -424,6 +424,7 @@ class Environment():
             elif self.reward == Reward.PROPORTIONAL:
                 reward = current_distance**2 / -100
             elif self.reward == Reward.RELATIVE_PROPORTIONAL:
+                scale = 1.1
                 reward = previous_distance - current_distance
             else:
                 reward = self.move_reward
