@@ -8,7 +8,7 @@ max_moves = 200
 wins  = 0
 losses = 0
 delay = 500
-env= environment.Environment(width=640,height=480,random_location=True,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16,x_collision_scale=3,y_collision_scale=3,silver=(.8,.8,.8),random_colors=True,random_lighting=True)
+env= environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16,x_collision_scale=3,y_collision_scale=3,silver=(.8,.8,.8),random_colors=False,random_lighting=False)
 
 num_actions = env.action_space()
 image_shape = np.shape(env.screenshot())
@@ -20,7 +20,7 @@ def q_loss(y_true, y_pred):
 
 with tf.device("/GPU:0"):
     #model = tf.keras.models.load_model('./models/ff1.h5',custom_objects={ 'q_loss': q_loss})
-    model = tf.keras.models.load_model('./models/cnnrandomRCP.h5')
+    model = tf.keras.models.load_model('./models/test.h5')
 
     
 def predict(state,legal_actions = env.legal_actions()):
@@ -40,7 +40,7 @@ def predict(state,legal_actions = env.legal_actions()):
             max_index = i
     return max_index, actions[max_index][0]
 #new_model.summary()
-env.random_location = False  
+  
 for i in range(test_iterations):
     state = env.reset()
     for t in range(max_moves):

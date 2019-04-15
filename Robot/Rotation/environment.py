@@ -46,9 +46,8 @@ class Environment():
             angle += 180
         return angle
     def random_position(self):
-            
         def rand_coordinate():
-            return (np.random.random() * Environment.square_width  + Environment.square_width / 2) * np.power(-1,np.random.randint (0,2))
+            return ( (np.random.random() * (Environment.square_width + 2))  + (Environment.square_width) / 2 -2) * np.power(-1,np.random.randint (0,2))
         x = rand_coordinate()
         y = rand_coordinate()
         angle = self.get_pos_angle(x,y)
@@ -424,8 +423,9 @@ class Environment():
             elif self.reward == Reward.PROPORTIONAL:
                 reward = current_distance**2 / -100
             elif self.reward == Reward.RELATIVE_PROPORTIONAL:
-                scale = 1.1
                 reward = previous_distance - current_distance
+                if reward == 0:
+                    reward = -.5
             else:
                 reward = self.move_reward
             #also end the game if there are no more legal actions in the new state 

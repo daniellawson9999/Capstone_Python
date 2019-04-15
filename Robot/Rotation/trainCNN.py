@@ -10,7 +10,7 @@ epsilon = 1
 gamma = .95
 alpha = .0001
 
-iterations = 700
+iterations = 2000
 decay_rate = 1/iterations
 test_iterations = 10
 max_moves =  80
@@ -30,8 +30,8 @@ reward_list = []
 training_win = 0
 training_loss = 0
 
-load_model = False
-load_name = 'cnnrandomP1.h5' 
+load_model = True
+load_name = 'cnnrandomturnp800.h5' 
 
 #env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
 env= environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,
