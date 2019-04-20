@@ -424,8 +424,8 @@ class Environment():
                 reward = current_distance**2 / -100
             elif self.reward == Reward.RELATIVE_PROPORTIONAL:
                 reward = previous_distance - current_distance
-                if reward == 0:
-                    reward = -.5
+                #if reward == 0:
+                    #reward = -.5
             else:
                 reward = self.move_reward
             #also end the game if there are no more legal actions in the new state 

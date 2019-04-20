@@ -10,7 +10,7 @@ epsilon = 1
 gamma = .95
 alpha = .0001
 
-iterations = 2000
+iterations = 1000
 decay_rate = 1/iterations
 test_iterations = 10
 max_moves =  80
@@ -30,7 +30,7 @@ reward_list = []
 training_win = 0
 training_loss = 0
 
-load_model = True
+load_model = False
 load_name = 'cnnrandomturnp800.h5' 
 
 #env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
@@ -52,7 +52,7 @@ num_actions = env.action_space()
 
 evaluate_training = True
 save_model = True
-model_name = "test.h5"
+model_name = "test2.h5"
 
  #based off deque example
 class ReplayMemory():

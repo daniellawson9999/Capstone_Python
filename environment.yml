@@ -1,0 +1,5 @@
+name: ENVNAME
+channels:
+  - defaults
+prefix: D:\Users\danie\Anaconda3\envs\ENVNAME
+
