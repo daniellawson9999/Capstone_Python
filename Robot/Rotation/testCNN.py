@@ -9,6 +9,7 @@ wins  = 0
 losses = 0
 delay = 500
 env= environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16,x_collision_scale=3,y_collision_scale=3,silver=(.8,.8,.8),random_colors=True,random_lighting=True)
+multi = False
 num_actions = env.action_space()
 image_shape = np.shape(env.screenshot())
 image_len = len(image_shape)
@@ -41,7 +42,10 @@ def predict(state,legal_actions = env.legal_actions()):
 #new_model.summary()
   
 for i in range(test_iterations):
-    state = env.reset()
+    if multi:
+            state = env.full_reset()
+    else:
+        state = env.reset()
     for t in range(max_moves):
         action,value = predict(state,env.legal_actions())
         #action = env.action_space.sample()

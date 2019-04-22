@@ -6,6 +6,7 @@ import collections
 import matplotlib.pyplot as plt
 from time import time
 
+
 epsilon = 1
 gamma = .95
 alpha = .0001
@@ -40,6 +41,7 @@ env= environment.Environment(width=640,height=480,random_location=False,mineral_
                              reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,
                              resize_scale=16,x_collision_scale=3,y_collision_scale=3,
                              silver=(.8,.8,.8),random_colors=True,random_lighting=True)
+multi = True
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 
@@ -52,7 +54,7 @@ num_actions = env.action_space()
 
 evaluate_training = True
 save_model = True
-model_name = "test2.h5"
+model_name = "test.h5"
 
  #based off deque example
 class ReplayMemory():
@@ -189,9 +191,6 @@ for i in range(iterations):
     print("starting iteration ",i)
     total_reward = 0
     state = env.reset()
-    #temp
-    while env.state() != environment.State.STANDARD:
-        state = env.reset()
     for m in range(max_moves):
         #select an action
         if np.random.random() > epsilon:
@@ -263,10 +262,12 @@ plt.show()
 if evaluate_training:
     env.random_location = False
     for i in range(test_iterations):
-        state = env.reset()
-        #temp
-        while env.state() != environment.State.STANDARD:
+        if multi:
+            state = env.full_reset()
+        else:
             state = env.reset()
+        
+        #temp
         for t in range(max_moves):
             action,value = predict(state,env.legal_actions())
             #action = env.action_space.sample()

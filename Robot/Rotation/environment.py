@@ -14,7 +14,10 @@ class State(Enum):
     WIN = auto()
     LOSS = auto()
     ILLEGAL = auto()
-    STANDARD = auto()   
+    STANDARD = auto()
+    GOLD_COLLISION = auto()
+    SILVER_COLLISION = auto()
+    WALL_COLLISION = auto()
 
 class Location(Enum):
     LEFT = 0
