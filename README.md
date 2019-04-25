@@ -11,6 +11,10 @@ Currently, this project contains a large portion of code unrelated to the projec
 
 Right now, some results have been scucesfully transfered to real life. There are a lot of different approaches I would like to try, which I will be working on while I still have time. 
 
+
+## Project Structure 
+coming soon
+
 ## Resources
 
 For now, here are some slides and videos about the project. I can attach scripts soon:
