@@ -1,15 +1,21 @@
 import environment
-from environment import Location,Reward,Action
+import multienvironment
+from multienvironment import Location,Reward,Action
 import tensorflow as tf
 import numpy as np
 
 test_iterations = 20
-max_moves = 200
+max_moves = 800
 wins  = 0
 losses = 0
 delay = 500
-env= environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_shift=15,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16,x_collision_scale=3,y_collision_scale=3,silver=(.8,.8,.8),random_colors=True,random_lighting=True)
-multi = False
+env= multienvironment.Environment(width=640,height=480,mineral_scale=.5,
+                             camera_height=3.5,camera_tilt=0,
+                             actions=[Action.FORWARDS,Action.CW,Action.CCW,Action.STAY],
+                             reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,
+                             resize_scale=16,
+                             silver=(.8,.8,.8),random_colors=True,random_lighting=True,silver_mineral_num=3,point_distance=9,stationary_scale=6,normal_scale = 2,stationary_win_count=5)
+multi = True
 num_actions = env.action_space()
 image_shape = np.shape(env.screenshot())
 image_len = len(image_shape)
@@ -20,7 +26,7 @@ def q_loss(y_true, y_pred):
 
 with tf.device("/GPU:0"):
     #model = tf.keras.models.load_model('./models/ff1.h5',custom_objects={ 'q_loss': q_loss})
-    model = tf.keras.models.load_model('./models/cnnrandomRCPT.h5')
+    model = tf.keras.models.load_model('./models/test.h5')
 
     
 def predict(state,legal_actions = env.legal_actions()):

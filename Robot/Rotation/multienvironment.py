@@ -374,7 +374,7 @@ class Environment():
         if y is None:
             y = pos[1]
         apothem = self.square_width * 3 / 2
-        if x > apothem or x < -apothem or y > apothem or y < -apothem:
+        if x > apothem - 1.5 or x < -apothem + 1.5 or y > apothem - 1.5 or y < -apothem + 1.5:
             return State.ILLEGAL
         else:
             return State.STANDARD
@@ -614,6 +614,6 @@ class Environment():
     
     def full_reset(self):
         self.exclude_zone = 4
-        self.reset()
+        ss = self.reset()
         self.init_position()
-        
+        return ss

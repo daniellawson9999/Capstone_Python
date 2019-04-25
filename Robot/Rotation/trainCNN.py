@@ -1,6 +1,6 @@
 import environment
 import multienvironment
-from environment import Action, Reward, Location
+from multienvironment import Action, Reward, Location
 import tensorflow as tf
 import numpy as np
 import collections
@@ -10,9 +10,10 @@ from time import time
 
 epsilon = 1
 gamma = .95
-alpha = .0001
+#probably way too small
+alpha = .001
 
-iterations = 300
+iterations = 150
 decay_rate = 1/iterations
 test_iterations = 10
 max_moves =  300
@@ -33,7 +34,7 @@ training_win = 0
 training_loss = 0
 
 load_model = False
-load_name = 'cnnrandomturnp800.h5' 
+load_name = 'test.h5' 
 
 #env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
 env= multienvironment.Environment(width=640,height=480,mineral_scale=.5,
@@ -43,6 +44,7 @@ env= multienvironment.Environment(width=640,height=480,mineral_scale=.5,
                              resize_scale=16,
                              silver=(.8,.8,.8),random_colors=True,random_lighting=True,silver_mineral_num=3,point_distance=9,stationary_scale=6,normal_scale = 2,stationary_win_count=5)
 multi = True
+
 env.loss_reward = loss_reward
 env.win_reward = win_reward
 
@@ -191,7 +193,10 @@ count = 0
 for i in range(iterations):
     print("starting iteration ",i)
     total_reward = 0
-    state = env.reset()
+    if multi:
+            state = env.full_reset()
+    else:
+        state = env.reset()
     for m in range(max_moves):
         #select an action
         if np.random.random() > epsilon:
@@ -242,9 +247,9 @@ for i in range(iterations):
         #update state
         state = next_state
         if done or m == max_moves - 1:
-            if game_state == environment.State.WIN:
+            if game_state == environment.State.WIN or game_state == multienvironment.State.WIN:
                 training_win += 1
-            if game_state == environment.State.LOSS:
+            if game_state == environment.State.LOSS or game_state == multienvironment.State.LOSS:
                 training_loss += 1
             print("total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
             #print("Episode finished after {} timesteps".format(t+1))
@@ -274,9 +279,9 @@ if evaluate_training:
             #action = env.action_space.sample()
             state, reward, done, game_state = env.step(action)
             if done:
-                if game_state == environment.State.WIN:
+                if game_state == environment.State.WIN or game_state == multienvironment.State.WIN:
                     wins += 1
-                elif game_state == environment.State.LOSS:
+                elif game_state == environment.State.LOSS or game_state == multienvironment.State.LOSS:
                     losses += 1
                 break
     print("{} wins, {} losses, {} reached max".format(wins/test_iterations, losses/test_iterations,(test_iterations-wins-losses)/test_iterations))
