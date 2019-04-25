@@ -5,7 +5,7 @@ Python Reinforcement Learning for FTC
 
 ## Project Description
 
-This project was originally created for a senior year capstone project. My inititial goal was to create a system that would create the foundatinon for a fully autonomous teleop program. Now that the project is winding, I plan on creating a little bit of documentation in case other people would like to contribute to this project. 
+This project was originally created for a senior year capstone project. My inititial goal was to create a system that would create the foundation for a fully autonomous teleop program. Now that the project is winding, I plan on creating a little bit of documentation in case other people would like to contribute to this project. 
 
 Currently, this project contains a large portion of code unrelated to the project and test and legacy code. Additionally, the sctructure of the code could be much cleaner. If other individuals are interesting in working on the project, this will become an a major area to work on. 
 
