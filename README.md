@@ -31,5 +31,5 @@ https://github.com/daniellawson9999/RL-Robot-Code
 coming soon
 
 ## Contact 
-Discord: Daniel_Lawson9999#7898 
+Discord: Daniel_Lawson9999#7898 (preferred)
 Email: daniellawson9999@gmail.com
