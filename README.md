@@ -17,6 +17,9 @@ For now, here are some slides and videos about the project. I can attach scripts
 [Most Recent Presentation](https://drive.google.com/open?id=1J4Uh5nRSOMGiJ5obVCKwYNi3b4-Cobms)
 [Google Drive folder of real life and simulated photos and videos](https://drive.google.com/open?id=1ko3aLJ-0wM7GeuNC-15_1sUnDqcl2LVh)
 
+### robot code repository:
+https://github.com/daniellawson9999/RL-Robot-Code
+
 
 ## To-do List
 coming soon
