@@ -13,7 +13,7 @@ Right now, some results have been scucesfully transfered to real life. There are
 
 
 ## Project Structure 
-coming soon
+coming soon, main project code is contained within: https://github.com/daniellawson9999/Capstone_Python/tree/master/Robot/Rotation
 
 ## Resources
 
