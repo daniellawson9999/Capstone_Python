@@ -29,3 +29,7 @@ https://github.com/daniellawson9999/RL-Robot-Code
 
 ## To-do List
 coming soon
+
+## Contact 
+Discord: Daniel_Lawson9999#7898 
+Email: daniellawson9999@gmail.com
