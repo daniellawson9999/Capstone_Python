@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 
 test_iterations = 20
-max_moves = 800
+max_moves = 600
 wins  = 0
 losses = 0
 delay = 500

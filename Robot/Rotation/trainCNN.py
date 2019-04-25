@@ -13,7 +13,7 @@ gamma = .95
 #probably way too small
 alpha = .001
 
-iterations = 150
+iterations = 300
 decay_rate = 1/iterations
 test_iterations = 10
 max_moves =  300
