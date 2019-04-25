@@ -1,4 +1,5 @@
 # Capstone_Python
+![a project graphic](https://lh3.googleusercontent.com/RxakennitreTdEfZPcK-4qq4JVzek6aQJIosyo6brvAJU6raEYJumaCbsg6EdyiRlQoK4m7YSDDOFN71LSFB=w1920-h943)
 Python Reinforcement Learning for FTC
 
 ## Project Description
