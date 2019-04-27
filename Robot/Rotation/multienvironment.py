@@ -329,7 +329,7 @@ class Environment():
         y = view_radius * np.sin(angle)
         fp = [x,y,self.camera_height]
         mlab.view(focalpoint=fp,distance=view_radius,elevation=-90,azimuth=np.rad2deg(angle))
-        mlab.show()
+        #mlab.show()
     
         
     def move_position(self,left = 0,right = 0,forwards = 0,backwards = 0, pos_angle = 0, neg_angle = 0, set_value = True):

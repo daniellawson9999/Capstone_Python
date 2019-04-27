@@ -285,7 +285,7 @@ class Environment():
         fp = [self.x-shift*np.cos(rad),self.y-shift*np.sin(rad),self.camera_height]
         #print(fp)
         mlab.view(focalpoint=fp, distance=view_radius, elevation=-90 + angle, azimuth=self.pos_angle)
-        mlab.show()
+        #mlab.show()
     
     def move_position(self,left = 0,right = 0,forwards = 0,backwards = 0, pos_angle = 0, neg_angle = 0, set_value = True):
         mlab.move(forwards - backwards, right - left,0)

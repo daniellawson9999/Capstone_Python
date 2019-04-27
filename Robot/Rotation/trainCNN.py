@@ -11,12 +11,12 @@ from time import time
 epsilon = 1
 gamma = .95
 #probably way too small
-alpha = .001
+alpha = .0003
 
-iterations = 300
+iterations = 1000
 decay_rate = 1/iterations
 test_iterations = 10
-max_moves =  300
+max_moves =  400
 win_reward = 100 
 loss_reward = -win_reward
 

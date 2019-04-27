@@ -153,5 +153,5 @@ dependencies:
     - werkzeug==0.14.1
     - wrapt==1.10.11
     - wxpython==4.0.4
-prefix: D:\Users\danie\Anaconda3\envs\capstone
+
 

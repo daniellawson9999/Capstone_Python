@@ -78,4 +78,3 @@ m1.plot()
 #m2.plot()
 m3.plot()
 
-mlab.show()
