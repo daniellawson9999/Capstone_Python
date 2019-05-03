@@ -1,5 +1,5 @@
 # Capstone_Python
-![a project graphic](https://lh3.googleusercontent.com/RxakennitreTdEfZPcK-4qq4JVzek6aQJIosyo6brvAJU6raEYJumaCbsg6EdyiRlQoK4m7YSDDOFN71LSFB=w1920-h943)
+![a project graphic](https://res.cloudinary.com/dpanlycrj/image/upload/v1556238157/Copy_of_visual_rf4hqc.png)
 
 Python Reinforcement Learning for FTC
 
@@ -22,6 +22,10 @@ For now, here are some slides and videos about the project. I can attach scripts
 * [First Presentation](https://drive.google.com/open?id=1XcURH9AAJknkbxcPnv8Txodlpo6b9Jzu)
 * [Most Recent Presentation](https://drive.google.com/open?id=1J4Uh5nRSOMGiJ5obVCKwYNi3b4-Cobms)
 * [Google Drive folder of real life and simulated photos and videos](https://drive.google.com/open?id=1ko3aLJ-0wM7GeuNC-15_1sUnDqcl2LVh)
+
+If you would like to know more about deep q learning, I would recommend the [Playing Atari with Deep Reinforcement Learning](https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf) which presented this approach. 
+## Setup
+Currently, it can be difficult to properly setup your dependencies. I will make a recommended setup guide and will eventually use a service such as docker. 
 
 ### robot code repository:
 https://github.com/daniellawson9999/RL-Robot-Code
