@@ -1,22 +1,20 @@
 import environment
 import multienvironment
-from multienvironment import Location,Reward,Action
+from environment import Location,Reward,Action
 import tensorflow as tf
 import numpy as np
 
 test_iterations = 20
-max_moves = 600
+max_moves = 300
 wins  = 0
 losses = 0
 delay = 500
-env= multienvironment.Environment(width=640,height=480,mineral_scale=.5,
-                             camera_height=3.5,camera_tilt=0,
-                             actions=[Action.FORWARDS,Action.CW,Action.CCW,Action.STAY],
-                             reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,
-                             resize_scale=16,
-                             silver=(.8,.8,.8),random_colors=True,random_lighting=True,silver_mineral_num=3,point_distance=9,stationary_scale=6,normal_scale = 2,stationary_win_count=5)
-multi = True
+env= environment.Environment(width=640,height=480,random_location=False,mineral_scale=.5,camera_height=3.5,camera_tilt=0,start_pos=23.5,actions=[Action.FORWARDS,Action.CW,Action.CCW,Action.STAY],reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,resize_scale=16,x_collision_scale=3,y_collision_scale=3,silver=(.8,.8,.8),random_colors=True,random_lighting=True)
+
+multi = False
 num_actions = env.action_space()
+
+
 image_shape = np.shape(env.screenshot())
 image_len = len(image_shape)
 
@@ -57,9 +55,9 @@ for i in range(test_iterations):
         #action = env.action_space.sample()
         state, reward, done, game_state = env.step(action)
         if done:
-            if game_state == environment.State.WIN:
+            if game_state == environment.State.WIN or game_state == multienvironment.State.WIN:
                 wins += 1
-            elif game_state == environment.State.LOSS:
+            elif game_state == environment.State.LOSS or game_state == multienvironment.State.LOSS:
                 losses += 1
             break
 print("{} wins, {} losses, {} reached max".format(wins/test_iterations, losses/test_iterations,(test_iterations-wins-losses)/test_iterations))

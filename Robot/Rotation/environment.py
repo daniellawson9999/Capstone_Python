@@ -37,6 +37,7 @@ class Action(Enum):
     BACKWARDS = auto()
     CW = auto()
     CCW = auto()
+    STAY = auto()
     
 class Environment():  
     square_width = 23.5
@@ -336,6 +337,8 @@ class Environment():
             actions[d[Action.CW]] = 1
         if d[Action.CCW] != None:
             actions[d[Action.CCW]] = 1
+        if d[Action.STAY] != None:
+            actions[d[Action.STAY]] = 1
             
         pos,focal = mlab.move()
         v = focal - pos
@@ -390,7 +393,7 @@ class Environment():
         #assign move or turn angle, use the enum value -1 because each enum value is ones based
         if action_name == Action.CW or action_name == Action.CCW:
             moves[action_name.value - 1] = self.turn_angle
-        else:
+        elif action_name != Action.STAY:
             moves[action_name.value - 1] = self.move_distance
         #store previous position
         previous_pos = mlab.move()[0]

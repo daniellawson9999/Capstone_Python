@@ -11,12 +11,12 @@ from time import time
 epsilon = 1
 gamma = .95
 #probably way too small
-alpha = .0003
+alpha = .001
 
 iterations = 1000
 decay_rate = 1/iterations
 test_iterations = 10
-max_moves =  400
+max_moves =  150
 win_reward = 100 
 loss_reward = -win_reward
 
@@ -34,7 +34,7 @@ training_win = 0
 training_loss = 0
 
 load_model = False
-load_name = 'test.h5' 
+load_name = 'multioverturning.h5' 
 
 #env = environment.Environment(random_minerals=True,random_location=False,mineral_location=Location.RIGHT,reward=Reward.RELATIVE_PROPORTIONAL,actions=[Action.FORWARDS,Action.LEFT,Action.RIGHT])
 env= multienvironment.Environment(width=640,height=480,mineral_scale=.5,
@@ -42,7 +42,9 @@ env= multienvironment.Environment(width=640,height=480,mineral_scale=.5,
                              actions=[Action.FORWARDS,Action.CW,Action.CCW,Action.STAY],
                              reward=Reward.RELATIVE_PROPORTIONAL,decorations=True,
                              resize_scale=16,
-                             silver=(.8,.8,.8),random_colors=True,random_lighting=True,silver_mineral_num=3,point_distance=9,stationary_scale=6,normal_scale = 2,stationary_win_count=5)
+                             silver=(.8,.8,.8),random_colors=True,random_lighting=True,
+                             silver_mineral_num=3,point_distance=9,stationary_scale=6,
+                             normal_scale = 2,stationary_win_count=5,shift_offset=2)
 multi = True
 
 env.loss_reward = loss_reward
@@ -106,7 +108,7 @@ with tf.device("/GPU:0"):
     #outputs= tf.keras.layers.Dense(1, activation= tf.keras.activations.linear)(hidden2)
     #model =  tf.keras.Model(inputs=inputs, outputs=outputs)
     if load_model:
-        model = tf.keras.models.load_model('./models/cnnrandomP1.h5')
+        model = tf.keras.models.load_model('./models/' + load_name)
     #state cnn combined with fc action to create a sa convnet
     else:
         image_input = tf.keras.Input(shape=image_shape)

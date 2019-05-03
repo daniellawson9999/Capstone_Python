@@ -83,7 +83,7 @@ class Environment():
                  decorations = False, camera_tilt =  0,
                  width = 900, height = (500-46),resize_scale=15,
                  k=5,silver=(.5,.5,.7), random_colors = False,random_lighting=False,
-                 silver_mineral_num = 3, point_distance = 9, stationary_scale =6, normal_scale = 2, stationary_win_count = 5):
+                 silver_mineral_num = 3, point_distance = 9, stationary_scale =6, normal_scale = 2, stationary_win_count = 5, shift_offset = 0):
         
         self.reward = reward
         self.grayscale = grayscale
@@ -109,6 +109,7 @@ class Environment():
         self.stationary_count = 0
         self.exclude_zone = -1
         self.mineral_scale = mineral_scale
+        self.shift_offset = shift_offset
     
         mlab.close(all=True)
         self.width = width
@@ -306,7 +307,7 @@ class Environment():
             
     def calculate_collision_box(self):
         point_distance = self.point_distance
-        shift_distance = point_distance / np.sqrt(2)
+        shift_distance = point_distance / np.sqrt(2) - self.shift_offset
         pos,focal = mlab.move()
         v = focal - pos
         v = np.asarray((v[0],v[1]))
@@ -476,13 +477,17 @@ class Environment():
         
         reward = 0
         
-        if wall_state == State.WALL_COLLISION:
-            reward += self.loss_reward / 2
+        #if wall_state == State.WALL_COLLISION:
+        #    reward += self.loss_reward / 2
             
-        if mineral_state == State.GOLD_COLLISION or mineral_state == State.SILVER_COLLISION:
+        if mineral_state == State.GOLD_COLLISION or mineral_state == State.SILVER_COLLISION or mineral_state == State.WALL_COLLISION:
             assert(zone != -1), "invalid zone assignment"
             self.exclude_zone = zone
             reward += self.loss_reward
+            if mineral_state == State.GOLD_COLLISION:
+                reward /= 3
+            if mineral_state == State.WALL_COLLISION:
+                reward /= 2
             game_state = State.LOSS
             done = True
         else:
