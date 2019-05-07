@@ -29,6 +29,9 @@ class Parameters(Enum):
     BATCH_SIZE = auto()
     OPTIMIZER = auto()
     EPOCHS = auto()
+    MIN_EPSILON = auto()
+    #This should be a string, currently only 'linear' is supported
+    EPSILON_DECAY = auto()
     
 
     
@@ -40,8 +43,9 @@ class Network(Enum):
     def __init__(self, env_type, argument_variable = None, argument_file = None, 
                  training_variables = None, training_file = None, training_name=None, 
                  load_name = None, load_model = False, network_type, custom_network = None,
-                 training_mode=Modes.TRAINING, use_tensorboard = True):
+                 training_mode=Modes.TRAINING, use_tensorboard = True, print_training=True):
         
+        self.env_type = env_type
         self.training_name = training_name
         self.training_mode = training_mode
         self.network_type = network_type
@@ -136,8 +140,9 @@ class Network(Enum):
         self.replay_memory = None
         
         #other variables for training
-        self.count = 0
         self.reward_lists = []
+        self.epsilon = 1
+        self.epsilon_decay_function = None
         
         if training_mode is not Modes.TESTING:
             #redo this logic eventually, support all tf optimizers 
@@ -149,10 +154,22 @@ class Network(Enum):
                 raise Exception('optimizer not found')
             self.model.compile(loss=tf.keras.losses.mean_squared_error,optimizer = optimizer(lr = self.ALPHA))    
             #test custom directory thing
+            
+            #initialize epsilon decay function
+            #right now, all functions should have 2 arg , epsilon and the total number of epochs
+            self.epsilon_decay_function = self.linear_decay
+        
             if use_tensorboard:
                 self.tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}/{}'.format(training_name,time()),batch_size = batch_size,   write_grads=True,write_images=True)
                 self.tensorboard.set_model(self.model)
+                
     
+    
+    
+    def linear_decay(self,epsilon, epochs):
+        increment = 1/epochs
+        new_epsilon = max(self.MIN_EPSILON, epsilon - increment)
+        return new_epsilon
     #init object -> (init_replay_memeory -> train -> save -> test) or (func train_save_test)
     def init_replay_memory(self):
         self.replay_memory = ReplayMemory(self.MAX_MEMORY_SIZE)
@@ -167,12 +184,105 @@ class Network(Enum):
                 state = next_state
                 if len(self.replay_memory.memory) >= batch_size: break
     
-    def train_single_epoch(self):
-        
-    def train(self):
+    def train(self, epochs = self.EPOCHS):
         assert (self.training_mode == Modes.TRAINING), "the class was not initialized for training"
-        
+        self.epsilon = 1
+        count = 0
+        training_win = 0
+        training_loss = 0
+        for i in range(epochs):
+            if print_training:
+                print("starting iteration ", i)
+            total_reward = 0
+            if self.env_type == Env.MULTI:
+                state = self.env.full_reset()
+            else:
+                state = self.env.reset()
+            for m in range(self.MAX_MOVES):
+                #select an action
+                if np.random.random() > self.epsilon:
+                    action,value = self.predict(state,self.env.legal_actions())
+                else:
+                    action = self.env.sample()
+            #transition  
+            next_state,reward, done, game_state = self.env.step(action)
+            total_reward += reward
+            #store transition
+            transition = [state,action,self.env.legal_actions(),reward,next_state,int(done)]
+            self.memory.store(transition)
+            #sample batch of transitions from memory
+            batch = self.memory.sample(self.BATCH_SIZE)
+            #create lists to store the states, actions, targets from the batch that will be passed to the model to train
+            states = list(np.zeros(batch_size))
+            actions = list(np.zeros(batch_size))
+            targets = list(np.zeros(batch_size))
+            
+            for j in range(self.BATCH_SIZE):
                 
+                #store the onehot encoded action
+                a = batch[j,1]
+                onehot = [0] * num_actions
+                onehot[a] = 1
+                actions[j] = onehot
+                
+                #store the state
+                s = batch[j,0]
+                states[j] = s
+                
+                #obtain the next state, legal_actions, reward, and terminal to determine the target
+                n_s = batch[j,4]
+                l = batch[j,2]
+                r = batch[j,3]
+                t = batch[j,5]
+                #if a terminal state, the target q value is simply the reward,
+                #otherwise use the standard equation
+                if t:
+                    targets[j] = r
+                else:
+                    index, value = predict(n_s,l)
+                    targets[j] = r + gamma * value
+            #convert back to np arrays for tensorflow
+            states = np.asarray(states)
+            actions = np.asarray(actions)
+            if self.network_type == Network.SA_TO_Q:
+                x = [states,actions]
+            elif self.network_type ==  Network.S_TO_QA:
+                x = states
+            else:
+                raise Exception('invalid network type in training')
+            y = targets
+            loss = model.train_on_batch(x = x, y = y)
+            logs = {}
+            logs['loss'] = loss
+            tensorboard.on_epoch_end(count, logs)
+            count += 1
+            #update state
+            state = next_state
+            if done or m == max_moves - 1:
+                if game_state == self.env.State.WIN:
+                    training_win += 1
+                if game_state == self.env.State.LOSS:
+                    training_loss += 1
+                print("total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
+                print("epsilon", self.epsilon)
+                #decrease epsilon following decay function
+                epsilon = self.epsilon_decay_function(epsilon, epochs)
+                self.reward_list.append(total_reward)
+                break
+        tensorboard.on_train_end(None)
+    #todo
+    def save_all(self):
+        #will do something
+        save = None
+    def save_model(self):
+        self.model.save('./models/' + self.training_name)
+        
+    def plot_rewards(self):
+        plt.plot(selfreward_list)
+        plt.ylabel('total reward')
+        plt.xlabel('episode')
+        plt.show()
+            
     def predict(self,state,legal_actions):
         actions = [0] * self.num_actions
         if self.network_type == Network.S_TO_QA:
