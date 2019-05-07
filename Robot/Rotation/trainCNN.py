@@ -266,6 +266,10 @@ plt.plot(reward_list)
 plt.ylabel('average_reward')
 plt.xlabel('episode')
 plt.show()
+
+if save_model:
+    model.save('./models/' + model_name)
+    
 #evaluate
 if evaluate_training:
     env.random_location = False
@@ -288,5 +292,3 @@ if evaluate_training:
                 break
     print("{} wins, {} losses, {} reached max".format(wins/test_iterations, losses/test_iterations,(test_iterations-wins-losses)/test_iterations))
 
-if save_model:
-    model.save('./models/' + model_name)
