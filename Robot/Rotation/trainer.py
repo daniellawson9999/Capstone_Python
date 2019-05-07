@@ -270,7 +270,6 @@ class Network(Enum):
                 self.reward_list.append(total_reward)
                 break
         tensorboard.on_train_end(None)
-    
     #todo
     def save_all(self):
         #will do something
