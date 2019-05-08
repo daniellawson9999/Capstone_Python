@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 import collections
 import matplotlib.pylot as plt
+import copy
 
 #Used to define the overall use of the training
 class Modes(Enum):
@@ -32,7 +33,23 @@ class Parameters(Enum):
     MIN_EPSILON = auto()
     #This should be a string, currently only 'linear' is supported
     EPSILON_DECAY = auto()
-    
+    #non-critical for training:
+    TEST_EPOCHS = auto()
+    TEST_MAX_MOVES = auto()
+
+#based off deque example
+class ReplayMemory():
+    def __init__(self, size):
+        self.memory = collections.deque(maxlen = size)
+        
+    def store(self, transition):
+        #transition should be an array of s,a,l,r,s',t
+        self.memory.append(transition)
+        
+    def sample(self,n):
+        memory_size = len(self.memory)
+        return np.asarray([self.memory[i] for i in 
+                (np.random.choice(np.arange(memory_size),size=n, replace=False))])
 
     
 #Enum that contains types of networks  
@@ -43,13 +60,13 @@ class Network(Enum):
     def __init__(self, env_type, argument_variable = None, argument_file = None, 
                  training_variables = None, training_file = None, training_name=None, 
                  load_name = None, load_model = False, network_type, custom_network = None,
-                 training_mode=Modes.TRAINING, use_tensorboard = True, print_training=True):
+                 training_mode=Modes.TRAINING, use_tensorboard = True, print_training=True, require_all_params = False):
         
         self.env_type = env_type
         self.training_name = training_name
         self.training_mode = training_mode
         self.network_type = network_type
-    
+        self.test_epochs = test_epochs
         #check for valid environment settings
         if env_type == Env.LEGACY:
             self.env_import = environment
@@ -84,10 +101,11 @@ class Network(Enum):
                 parameter_list = None
                 raise Exception('no training argument parameters specified')
             
-            #make sure all listed parameters are defined, this is done seperately incase this can be overrided 
-            for parameter in Parameters:
-                if parameter not in parameter_list:
-                    raise Exception('parameter list is missing required parameters for training')
+            #instead of a boolean which turns requirement on/off, there will be a list of params that are crucial for testing
+            if require_all_params:
+                for parameter in Parameters:
+                    if parameter not in parameter_list:
+                        raise Exception('parameter list is missing required parameters for training')
         
             #convert parameter list to class fields
             for parameter in parameter_list:
@@ -163,13 +181,12 @@ class Network(Enum):
                 self.tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}/{}'.format(training_name,time()),batch_size = batch_size,   write_grads=True,write_images=True)
                 self.tensorboard.set_model(self.model)
                 
-    
-    
-    
-    def linear_decay(self,epsilon, epochs):
-        increment = 1/epochs
-        new_epsilon = max(self.MIN_EPSILON, epsilon - increment)
-        return new_epsilon
+    #function does everything at once
+    def train_test_save(self, train_epochs = self.EPOCHS, test_epochs = self.TEST_EPOCHS, save_name = self.training_name):
+        self.train(train_epochs)
+        self.plot_rewards()
+        self.test(test_epochs)
+        self.save_all(save_name)
     #init object -> (init_replay_memeory -> train -> save -> test) or (func train_save_test)
     def init_replay_memory(self):
         self.replay_memory = ReplayMemory(self.MAX_MEMORY_SIZE)
@@ -183,9 +200,36 @@ class Network(Enum):
                 transition = [state, action, self.env.legal_actions(),reward,next_state,int(done)]
                 state = next_state
                 if len(self.replay_memory.memory) >= batch_size: break
+    def linear_decay(self,epsilon, epochs):
+        increment = 1/epochs
+        new_epsilon = max(self.MIN_EPSILON, epsilon - increment)
+        return new_epsilon
+    
+    def predict(self,state,legal_actions):
+        actions = [0] * self.num_actions
+        if self.network_type == Network.S_TO_QA:
+            for i in range(self.num_actions):
+                action = [0] * self.num_actions
+                action[i] = 1
+                #returns a 2d array such as [[8.0442]], we want to make an array of like [[234],[23432],[2343]]
+                actions[i] = model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0]
+        elif self.network_type == Network.SA_TO_Q:
+            #check this out
+            actions = model.predict(np.expand_dims(state,0))
+        else:    
+            raise Exception('invalid network type')
+        max_index = 0
+        for i in range(len(actions)):
+            if legal_actions[max_index] == 0 and legal_actions[i] == 1:
+                max_index = i
+            if actions[max_index][0] < actions[i][0] and legal_actions[i] == 1:
+                max_index = i
+        return max_index, actions[max_index][0]
     
     def train(self, epochs = self.EPOCHS):
         assert (self.training_mode == Modes.TRAINING), "the class was not initialized for training"
+        #initialize the training replay memory, so that there is enough experience for the first training batch 
+        self.init_replay_memory()
         self.epsilon = 1
         count = 0
         training_win = 0
@@ -270,39 +314,53 @@ class Network(Enum):
                 self.reward_list.append(total_reward)
                 break
         tensorboard.on_train_end(None)
-    #todo
-    def save_all(self):
-        #will do something
-        save = None
-    def save_model(self):
-        self.model.save('./models/' + self.training_name)
-        
+
+    def test(self, epochs = self.TEST_EPOCHS):
+        wins = 0
+        losses = 0
+        if self.env_type == Env.LEGACY:
+            self.env.random_location = False
+        for i in range(epochs):
+            if self.env_type == Env.MULTI:
+                state = self.env.full_reset()
+            else:
+                state = self.env.reset()
+            for t in range(self.TEST_MAX_MOVES):
+                action,value = self.predict(state,self.env.legal_actions())
+                state,reward,done,game_state = self.env.step(action)
+                if done:
+                    if game_state == self.env.State.WIN:
+                        training_win += 1
+                    elif game_state == self.env.State.LOSS:
+                        training_loss += 1 
+                    break
+        reached_max = epochs-wins-losses
+        print("{} wins, {} losses, {} reached max".format(wins/epochs, losses/epochs,(reach_max)/epochs))
+        return wins, losses, reached_max
+
     def plot_rewards(self):
         plt.plot(selfreward_list)
         plt.ylabel('total reward')
         plt.xlabel('episode')
-        plt.show()
-            
-    def predict(self,state,legal_actions):
-        actions = [0] * self.num_actions
-        if self.network_type == Network.S_TO_QA:
-            for i in range(self.num_actions):
-                action = [0] * self.num_actions
-                action[i] = 1
-                #returns a 2d array such as [[8.0442]], we want to make an array of like [[234],[23432],[2343]]
-                actions[i] = model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0]
-        elif self.network_type == Network.SA_TO_Q:
-            #check this out
-            actions = model.predict(np.expand_dims(state,0))
-        else:    
-            raise Exception('invalid network type')
-        max_index = 0
-        for i in range(len(actions)):
-            if legal_actions[max_index] == 0 and legal_actions[i] == 1:
-                max_index = i
-            if actions[max_index][0] < actions[i][0] and legal_actions[i] == 1:
-                max_index = i
-        return max_index, actions[max_index][0]
+        plt.show()    
+         
+    def dict_to_str(self,dictionary):
+        new_dictionary = copy.deepcopy(dictionary)
+        for key in dictionary:
+            if type(dictionary[key]) is list:
+                for i, item in enumerate(dictionary[key]):
+                    if isinstance(item,Enum):
+                        new_dictionary[key][i] = str(item)
+            else:
+                if isinstance(dictionary[key],Enum):
+                        new_dictionary[key] = dictionary[key]
+        return new_dictionary         
+     #todo
+    def save_all(self, save_name = self.training_name):
+        #will do something
+        save = None
+    def save_model(self, save_name = self.training_name):
+        self.model.save('./models/' + save_name)
     
     def write_arguments(self,file_name,args_dict):
         file = open('./model_env_arugments/' + file_name + '.txt')
@@ -315,17 +373,6 @@ class Network(Enum):
         dictionary = eval(contents)
         file.close()
         return dictionary
+    
+   
 
-#based off deque example
-class ReplayMemory():
-    def __init__(self, size):
-        self.memory = collections.deque(maxlen = size)
-        
-    def store(self, transition):
-        #transition should be an array of s,a,l,r,s',t
-        self.memory.append(transition)
-        
-    def sample(self,n):
-        memory_size = len(self.memory)
-        return np.asarray([self.memory[i] for i in 
-                (np.random.choice(np.arange(memory_size),size=n, replace=False))])
