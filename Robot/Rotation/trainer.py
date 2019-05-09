@@ -31,12 +31,13 @@ class Parameters(Enum):
     OPTIMIZER = auto()
     EPOCHS = auto()
     MIN_EPSILON = auto()
-    #This should be a string, currently only 'linear' is supported
     EPSILON_DECAY = auto()
     #non-critical for training:
     TEST_EPOCHS = auto()
     TEST_MAX_MOVES = auto()
 
+class Decay(Enum):
+    LINEAR = auto()
 #based off deque example
 class ReplayMemory():
     def __init__(self, size):
@@ -57,8 +58,8 @@ class Network(Enum):
     SA_TO_Q = auto()
     S_TO_QA = auto()
     
-    def __init__(self, env_type, argument_variable = None, argument_file = None, 
-                 training_variables = None, training_file = None, training_name=None, 
+    def __init__(self, env_type, env_dict = None, env_file_name = None, 
+                 training_dict = None, training_file_name = None, training_name=None, 
                  load_name = None, load_model = False, network_type, custom_network = None,
                  training_mode=Modes.TRAINING, use_tensorboard = True, print_training=True, require_all_params = False):
         
@@ -77,10 +78,10 @@ class Network(Enum):
             raise Exception('invalid environment type, refer to the Env Enum for valid env types')
         
         #Load environment arguments
-        if argument_file is not None:
-            self.env_args = self.read_arguments(argument_file)
-        elif argument_variable is not None:
-            self.env_args = argument_variable
+        if env_file_name is not None:
+            self.env_args = self.read_dict('./args/environment/' + env_file_name + '.txt')
+        elif env_dict is not None:
+            self.env_args = env_dict
         else:
             self.env_args = None
             raise Exception('no environment argument parameters specified')
@@ -93,24 +94,24 @@ class Network(Enum):
         #load training parameters and set as class fields
         if trainig_model is not Modes.TESTING: 
             #Load training arguments
-            if training_file is not None:
-                parameter_list = self.read_arguments(training_file)
-            elif training_variables is not None:
-                parameter_list = training_variables
+            if training_fil_name is not None:
+                self.parameter_dict = self.read_dict('./args/training/' + training_file_name + '.txt')
+            elif training_dict is not None:
+                self.parameter_dict = training_dict
             else:
-                parameter_list = None
+                self.parameter_dict = None
                 raise Exception('no training argument parameters specified')
             
             #instead of a boolean which turns requirement on/off, there will be a list of params that are crucial for testing
-            if require_all_params:
-                for parameter in Parameters:
-                    if parameter not in parameter_list:
-                        raise Exception('parameter list is missing required parameters for training')
+            #if require_all_params:
+              #  for parameter in Parameters:
+                 #   if parameter not in parameter_dict:
+                    #    raise Exception('parameter list is missing required parameters for training')
         
             #convert parameter list to class fields
-            for parameter in parameter_list:
+            for parameter in self.parameter_dict:
                 #in case string based parameters are supported, this may not be needed
-                setattr(self,parameter.name,parameter_list[parameter])
+                setattr(self,parameter.name,self.parameter_dict[parameter])
         
         #Set up the network, custom_network should pass an uncompiled model built with keras layers
         #either load a pre-trained model or create a new model
@@ -148,8 +149,21 @@ class Network(Enum):
                     self.model = tf.keras.Model(inputs=[image_input,action_input], outputs = output)
                     
                 elif network_type == Network.S_TO_QA:
-                    #todo
-                    raise Exception('todo')
+                    image_input = tf.keras.Input(shape=image_shape)
+            
+                    conv1 = tf.keras.layers.Conv2D(32, kernel_size=(5, 5), activation=tf.keras.activations.relu,strides=1)(image_input)
+                    pooling1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
+                    drop1 = tf.keras.layers.Dropout(.25)(pooling1)
+                    
+                    conv2 = tf.keras.layers.Conv2D(64, kernel_size=(5, 5), strides=1, activation=tf.keras.activations.relu)(drop1)
+                    pooling2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+                    drop2 = tf.keras.layers.Dropout(0.25)(pooling2)
+                    
+                    flat = tf.keras.layers.Flatten()(drop2)
+                    conv_dense = tf.keras.layers.Dense(100, activation=tf.keras.activations.relu)(flat)
+                    output = tf.keras.layers.Dense(num_actions,activation=tf.keras.activations.linear)(conv_dense)
+                    
+                    self.model = tf.keras.Model(inputs=image_input, outputs = output)
                 else:
                     raise Exception('invalid network type')
                 #compile the model
@@ -164,18 +178,17 @@ class Network(Enum):
         
         if training_mode is not Modes.TESTING:
             #redo this logic eventually, support all tf optimizers 
-            if self.OPTIMIZER == 'Adam':
-                optimizer = tf.keras.optimizers.Adam
-            elif self.OPTIMIZER == 'SGD':
-                optimizer = tf.keras.optimizers.SGD
-            else:
-                raise Exception('optimizer not found')
-            self.model.compile(loss=tf.keras.losses.mean_squared_error,optimizer = optimizer(lr = self.ALPHA))    
+            if self.OPTIMIZER is None:
+                self.OPTIMIZER = tf.keras.optimizers.Adam
+            self.model.compile(loss=tf.keras.losses.mean_squared_error,optimizer = self.OPTIMIZER(lr = self.ALPHA))    
             #test custom directory thing
             
             #initialize epsilon decay function
             #right now, all functions should have 2 arg , epsilon and the total number of epochs
-            self.epsilon_decay_function = self.linear_decay
+            if self.EPSILON_DECAY == Decay.LINEAR:
+                self.epsilon_decay_function = self.linear_decay
+            else:
+                raise Exception('Decay function not found')
         
             if use_tensorboard:
                 self.tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}/{}'.format(training_name,time()),batch_size = batch_size,   write_grads=True,write_images=True)
@@ -345,33 +358,40 @@ class Network(Enum):
         plt.show()    
          
     def dict_to_str(self,dictionary):
-        new_dictionary = copy.deepcopy(dictionary)
-        #update all values, including those stored in an array
-        for key in dictionary:
-            if type(dictionary[key]) is list:
-                for i, item in enumerate(dictionary[key]):
-                    if isinstance(item,Enum):
-                        new_dictionary[key][i] = str(item)
+        string = str(dictionary)
+        string = string.replace("<","")
+        i = 0
+        while(i < len(string)):
+            if string[i] == ">":
+                string = string[:i-3] + string[i+1:]   
+                i -= 3
             else:
-                if isinstance(dictionary[key],Enum):
-                        new_dictionary[key] = str(dictionary[key])
-            #see if the key also needs to be updated
-                        
-        return str(new_dictionary)         
+                i += 1
+        return string        
      #todo
     def save_all(self, save_name = self.training_name):
-        #will do something
-        save = None
+        self.save_parameter_dict(save_name)
+        self.save_environment_dict(save_name)
+        self.save_model(save_name)
+        
+    def save_environment_dict(self, save_name = self.training_name):
+        path = './args/environment/' + save_name + '.txt'
+        self.write_dict(path, self.env_args)
+        
+    def save_parameter_dict(self, save_name = self.training_name):
+        path = './args/training/' + save_name + '.txt'
+        self.write_dict(path, self.parameter_dict)
+
     def save_model(self, save_name = self.training_name):
         self.model.save('./models/' + save_name)
     
-    def write_arguments(self,file_name,args_dict):
-        file = open('./model_env_arugments/' + file_name + '.txt')
-        file.write(str(args_dict))
+    def write_dict(self,file_name,args_dict):
+        file = open(file_name)
+        file.write(dict_to_str(args_dict))
         file.close()
         
-    def read_arguments(self, file_name):
-        file = open('./model_env_arugments/' + file_name + '.txt')
+    def read_dict(self, file_name):
+        file = open(file_name)
         contents = file.read()
         dictionary = eval(contents)
         file.close()
