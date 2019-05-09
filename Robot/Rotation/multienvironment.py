@@ -83,7 +83,8 @@ class Environment():
                  decorations = False, camera_tilt =  0,
                  width = 900, height = (500-46),resize_scale=15,
                  k=5,silver=(.5,.5,.7), random_colors = False,random_lighting=False,
-                 silver_mineral_num = 3, point_distance = 9, stationary_scale =6, normal_scale = 2, stationary_win_count = 5, shift_offset = 0):
+                 silver_mineral_num = 3, point_distance = 9, stationary_scale =6, 
+                 normal_scale = 2, stationary_win_count = 5, shift_offset = 0, close_all = True):
         
         self.reward = reward
         self.grayscale = grayscale
@@ -111,7 +112,8 @@ class Environment():
         self.mineral_scale = mineral_scale
         self.shift_offset = shift_offset
     
-        mlab.close(all=True)
+        if close_all:
+            mlab.close(all=True)
         self.width = width
         self.height = height + 46
         self.f = mlab.figure(size=(self.width,self.height),bgcolor = (1,1,1))
