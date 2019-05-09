@@ -346,6 +346,7 @@ class Network(Enum):
          
     def dict_to_str(self,dictionary):
         new_dictionary = copy.deepcopy(dictionary)
+        #update all values, including those stored in an array
         for key in dictionary:
             if type(dictionary[key]) is list:
                 for i, item in enumerate(dictionary[key]):
@@ -353,8 +354,10 @@ class Network(Enum):
                         new_dictionary[key][i] = str(item)
             else:
                 if isinstance(dictionary[key],Enum):
-                        new_dictionary[key] = dictionary[key]
-        return new_dictionary         
+                        new_dictionary[key] = str(dictionary[key])
+            #see if the key also needs to be updated
+                        
+        return str(new_dictionary)         
      #todo
     def save_all(self, save_name = self.training_name):
         #will do something
