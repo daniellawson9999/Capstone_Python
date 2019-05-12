@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import copy
 from time import time
 
+
 #Used to define the overall use of the training
 class Modes(Enum):
     TRAINING = auto()
@@ -36,6 +37,7 @@ class Parameters(Enum):
     #non-critical for training:
     TEST_EPOCHS = auto()
     TEST_MAX_MOVES = auto()
+    CONTINUOUS = auto()
     
 class Optimizer(Enum):
     ADAM = auto()
@@ -250,29 +252,21 @@ class Agent():
                 action = [0] * self.num_actions
                 action[i] = 1
                 #returns a 2d array such as [[8.0442]], we want to make an array of like [[234],[23432],[2343]]
-                actions[i] = self.model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0]
+                actions[i] = self.model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0][0]
         elif self.network_type == Network.S_TO_QA:
             #check this out
-            actions = self.model.predict(np.expand_dims(state,0))
+            actions = self.model.predict(np.expand_dims(state,0))[0]
         else:    
             raise Exception('invalid network type')
         max_index = 0
         for i in range(len(actions)):
             if legal_actions[max_index] == 0 and legal_actions[i] == 1:
                 max_index = i
-            if actions[max_index][0] < actions[i][0] and legal_actions[i] == 1:
+            if actions[max_index] < actions[i] and legal_actions[i] == 1:
                 max_index = i
-        return max_index, actions[max_index][0]
+        return max_index, actions[max_index]
     
-    #reminder:
-    # make the agent to approximately map
-    # the current state to future discounted reward
-    # We'll call that target_f
-    #target_f = self.model.predict(state)
-    #target_f[0][action] = target
-    # Train the Neural Net with the state and target_f
-    
-    self.model.fit(state, target_f, epochs=1, verbose=0)
+   
     def train(self, epochs = None):
         if epochs is None:
             epochs = self.EPOCHS
@@ -288,7 +282,10 @@ class Agent():
                 print("starting iteration ", i)
             total_reward = 0
             if self.env_type == Env.MULTI:
-                state = self.env.full_reset()
+                if self.CONTINUOUS:
+                    state = self.env.reset()
+                else:
+                    state = self.env.full_reset()
             else:
                 state = self.env.reset()
             for m in range(self.MAX_MOVES):
@@ -297,74 +294,100 @@ class Agent():
                     action,value = self.predict(state,self.env.legal_actions())
                 else:
                     action = self.env.sample()
-            #transition  
-            next_state,reward, done, game_state = self.env.step(action)
-            total_reward += reward
-            #store transition
-            transition = [state,action,self.env.legal_actions(),reward,next_state,int(done)]
-            self.replay_memory.store(transition)
-            #sample batch of transitions from memory
-            batch = self.replay_memory.sample(self.BATCH_SIZE)
-            #create lists to store the states, actions, targets from the batch that will be passed to the model to train
-            states = list(np.zeros(self.BATCH_SIZE))
-            actions = list(np.zeros(self.BATCH_SIZE))
-            if targets = list(np.zeros((self.BATCH_SIZE,self.num_actions)))
-            
-            for j in range(self.BATCH_SIZE):
-                
-                #store the onehot encoded action
-                a = batch[j,1]
-                onehot = [0] * self.num_actions
-                onehot[a] = 1
-                actions[j] = onehot
-                
-                #store the state
-                s = batch[j,0]
-                states[j] = s
-                
-                #obtain the next state, legal_actions, reward, and terminal to determine the target
-                n_s = batch[j,4]
-                l = batch[j,2]
-                r = batch[j,3]
-                t = batch[j,5]
-                #if a terminal state, the target q value is simply the reward,
-                #otherwise use the standard equation
-                targets[]
-                if t:
-                    targets[j] = r
+                #transition  
+                next_state,reward, done, game_state = self.env.step(action)
+                total_reward += reward
+                #store transition
+                transition = [state,action,self.env.legal_actions(),reward,next_state,int(done)]
+                self.replay_memory.store(transition)
+                #sample batch of transitions from memory
+                batch = self.replay_memory.sample(self.BATCH_SIZE)
+                #create lists to store the states, actions, targets from the batch that will be passed to the model to train
+                states = list(np.zeros(self.BATCH_SIZE))
+                actions = list(np.zeros(self.BATCH_SIZE))
+                if self.network_type == Network.SA_TO_Q:
+                    targets = list(np.zeros(self.BATCH_SIZE))
+                elif self.network_type == Network.S_TO_QA:
+                    targets = list(np.zeros((self.BATCH_SIZE,self.num_actions)))
                 else:
-                    index, value = self.predict(n_s,l)
-                    targets[j] = r + self.GAMMA * value
-            #convert back to np arrays for tensorflow
-            states = np.asarray(states)
-            actions = np.asarray(actions)
-            if self.network_type == Network.SA_TO_Q:
-                x = [states,actions]
-            elif self.network_type ==  Network.S_TO_QA:
-                x = states
-            else:
-                raise Exception('invalid network type in training')
-            y = targets
-            loss = self.model.train_on_batch(x = x, y = y)
-            logs = {}
-            logs['loss'] = loss
-            
-            self.tensorboard.on_epoch_end(count, logs)
-            count += 1
-            #update state
-            state = next_state
-            if done or m == self.MAX_MOVES - 1:
-                if game_state == self.env_import.State.WIN:
-                    training_win += 1
-                if game_state == self.env_import.State.LOSS:
-                    training_loss += 1
-                print("total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
-                print("epsilon", self.epsilon)
-                #decrease epsilon following decay function
-                self.epsilon = self.epsilon_decay_function(self.epsilon, epochs)
-                self.reward_list.append(total_reward)
-                break
+                    raise Exception('invalid network type')
+                
+                
+                for j in range(self.BATCH_SIZE):
+                    
+                    #store the onehot encoded action
+                    a = batch[j,1]
+                    onehot = [0] * self.num_actions
+                    onehot[a] = 1
+                    actions[j] = onehot
+                    
+                    #store the state
+                    s = batch[j,0]
+                    states[j] = s
+                    
+                    #obtain the next state, legal_actions, reward, and terminal to determine the target
+                    n_s = batch[j,4]
+                    l = batch[j,2]
+                    r = batch[j,3]
+                    t = batch[j,5]
+                    #the target is a little bit different depending on the style of the q network
+                    #if SA-Q network is used, the target is simply a single value
+                    #S_QA networks have multiple outputs, but we only want to adjust the network for the one
+                    #action that this example is from, so we will make the predicted values
+                    #for every other action the same as what the network currently predicts,
+                    #so there is zero mean squared error on that action, meaning weights associated with 
+                    #that action are not updated
+                    if self.network_type == Network.SA_TO_Q:
+                        #if a terminal state, the target q value is simply the reward,
+                        #otherwise use the standard equation
+                        if t:
+                            targets[j] = r
+                        else:
+                            index, value = self.predict(n_s,l)
+                            targets[j] = r + self.GAMMA * value
+                    elif self.network_type == Network.S_TO_QA:
+                        #init target array to for example j to be equal to the predicted
+                        targets[j] = list(self.model.predict(np.expand_dims(states[j],0))[0])
+                        #change the value for the desired action to be equal to b equation
+                        if t:
+                            targets[j][a] = r
+                        else:
+                            index, value = self.predict(n_s,l)
+                            targets[j][a] = r + self.GAMMA * value
+                       
+                #convert back to np arrays for tensorflow
+                states = np.asarray(states)
+                actions = np.asarray(actions)
+                targets = np.asarray(targets)
+                if self.network_type == Network.SA_TO_Q:
+                    x = [states,actions]
+                elif self.network_type ==  Network.S_TO_QA:
+                    x = states
+                else:
+                    raise Exception('invalid network type in training')
+                y = targets
+                loss = self.model.train_on_batch(x = x, y = y)
+                logs = {}
+                logs['loss'] = loss
+                
+                self.tensorboard.on_epoch_end(count, logs)
+                count += 1
+                #update state
+                state = next_state
+                if done or m == self.MAX_MOVES - 1:
+                    if game_state == self.env_import.State.WIN:
+                        training_win += 1
+                    if game_state == self.env_import.State.LOSS:
+                        training_loss += 1
+                    if(self.print_training):
+                        print("total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
+                        print("epsilon", self.epsilon)
+                    #decrease epsilon following decay function
+                    self.epsilon = self.epsilon_decay_function(self.epsilon, epochs)
+                    self.reward_list.append(total_reward)
+                    break
         self.tensorboard.on_train_end(None)
+        return training_win, training_loss
 
     def test(self, epochs = None):
         wins = 0
@@ -390,6 +413,7 @@ class Agent():
                         losses += 1 
                     break
         reached_max = epochs-wins-losses
+        print(self.training_name + ": test results\n")
         print("{} wins, {} losses, {} reached max".format(wins/epochs, losses/epochs,(reached_max)/epochs))
         return wins, losses, reached_max
 
@@ -398,6 +422,7 @@ class Agent():
         plt.ylabel('total reward')
         plt.xlabel('episode')
         plt.show()    
+        return self.reward_list
          
     def dict_to_str(self,dictionary):
         string = str(dictionary)

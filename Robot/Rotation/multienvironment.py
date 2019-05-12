@@ -30,6 +30,10 @@ class Location(Enum):
     LEFT = 0
     CENTER = 1
     RIGHT = 2
+    
+class Goal(Enum):
+    COLLISION = auto()
+    ALIGN = auto()
 
 class Reward(Enum):
     TERMINAL = auto()
@@ -84,7 +88,8 @@ class Environment():
                  width = 900, height = (500-46),resize_scale=15,
                  k=5,silver=(.5,.5,.7), random_colors = False,random_lighting=False,
                  silver_mineral_num = 3, point_distance = 9, stationary_scale =6, 
-                 normal_scale = 2, stationary_win_count = 5, shift_offset = 0, close_all = True):
+                 normal_scale = 2, stationary_win_count = 5, shift_offset = 0, 
+                 close_all = True, goal = Goal.ALIGN, penalize_walls = False, walls_terminal = False, figure_name = None):
         
         self.reward = reward
         self.grayscale = grayscale
@@ -111,12 +116,15 @@ class Environment():
         self.exclude_zone = -1
         self.mineral_scale = mineral_scale
         self.shift_offset = shift_offset
-    
+        self.goal = goal
+        self.penalize_walls = penalize_walls
+        self.walls_terminal = walls_terminal
+        self.figure_name = figure_name
         if close_all:
             mlab.close(all=True)
         self.width = width
         self.height = height + 46
-        self.f = mlab.figure(size=(self.width,self.height),bgcolor = (1,1,1))
+        self.f = mlab.figure(figure = self.figure_name, size=(self.width,self.height),bgcolor = (1,1,1))
         self.f.scene._lift()
        
         
@@ -466,7 +474,9 @@ class Environment():
         new_pos = mlab.move()[0]
         
         #get the reward
+        #check for collision w/ minerals
         mineral_state, zone = self.check_collisions(self.normal_scale)
+        #check for collision w/ 
         wall_state = self.check_wall_collision()
         game_state = State.STANDARD
         stationary,stationary_zone  = self.in_stationary_zone()
@@ -481,22 +491,30 @@ class Environment():
         
         #if wall_state == State.WALL_COLLISION:
         #    reward += self.loss_reward / 2
-            
-        if mineral_state == State.GOLD_COLLISION or mineral_state == State.SILVER_COLLISION or mineral_state == State.WALL_COLLISION:
-            assert(zone != -1), "invalid zone assignment"
+        
+        if mineral_state == State.GOLD_COLLISION or mineral_state == State.SILVER_COLLISION or (wall_state == State.WALL_COLLISION and self.walls_terminal):
             self.exclude_zone = zone
-            reward += self.loss_reward
+            #assert(zone != -1 and mineral_state != State.STANDARD), "invalid zone assignment"
             if mineral_state == State.GOLD_COLLISION:
-                reward /= 3
-            if mineral_state == State.WALL_COLLISION:
-                reward /= 2
-            game_state = State.LOSS
+                if self.goal == Goal.COLLISION:
+                    game_state = State.WIN
+                    reward += self.win_reward
+                elif self.goal == Goal.ALIGN:
+                    game_state = State.LOSS
+                    reward += self.loss_reward
+                else:
+                    raise Exception('Goal is not defined')
+            elif mineral_state == State.SILVER_COLLISION:
+                game_state = State.LOSS
+                reward += self.loss_reward
+            elif wall_state == State.WALL_COLLISION:
+                reward += self.loss_reward / 2
             done = True
         else:
             done = False
             #calculate previous and current distances
         
-            
+            #reward for movement, relative proportional vs move_reward (-1)
             if self.reward == Reward.RELATIVE_PROPORTIONAL:
                 def distance(x1,y1,x2,y2):
                     return np.sqrt((x2-x1)**2 + (y2-y1)**2)
@@ -514,18 +532,27 @@ class Environment():
             else:
                 reward += self.move_reward
                 
-            if stationary:
-                reward += self.win_reward
-            
-            if self.stationary_count == self.stationary_win_count:
-               assert(stationary_zone != -1), "invalid stationary_zone assignment"
-               self.exclude_zone = stationary_zone
-               game_state = State.WIN
-               done = True
+            #penalization for hitting a wall
+            if self.penalize_walls and wall_state == State.WALL_COLLISION:
+                if self.walls_terminal:
+                    raise Exception('wall collision should have been handled in the terminal block, but was not')
+                else:
+                    reward += self.loss_reward / 3
+                
+            if self.goal == Goal.ALIGN:
+                #reward agent for staying close to gold mineral but not collding
+                if stationary:
+                    reward += self.win_reward
+                
+                if self.stationary_count == self.stationary_win_count:
+                   assert(stationary_zone != -1), "invalid stationary_zone assignment"
+                   self.exclude_zone = stationary_zone
+                   game_state = State.WIN
+                   done = True
                
             #also end the game if there are no more legal actions in the new state 
             if max(self.legal_actions()) == 0:
-               self.exclude_zone = 4
+               self.exclude_zone = -1
                done = True
             
         next_state = self.screenshot()
