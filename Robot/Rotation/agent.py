@@ -380,7 +380,7 @@ class Agent():
                     if game_state == self.env_import.State.LOSS:
                         training_loss += 1
                     if(self.print_training):
-                        print("total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
+                        print(self.training_name + ": total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
                         print("epsilon", self.epsilon)
                     #decrease epsilon following decay function
                     self.epsilon = self.epsilon_decay_function(self.epsilon, epochs)
@@ -418,7 +418,9 @@ class Agent():
         return wins, losses, reached_max
 
     def plot_rewards(self):
+        fig = plt.figure()
         plt.plot(self.reward_list)
+        fig.suptitle(self.training_name, fontsize=20)
         plt.ylabel('total reward')
         plt.xlabel('episode')
         plt.show()    
@@ -465,6 +467,7 @@ class Agent():
     def read_dict(self, file_name):
         Action = self.env_import.Action
         Reward = self.env_import.Reward
+        Goal = self.env_import.Goal
         file = open(file_name,"r")
         contents = file.read()
         dictionary = eval(contents)

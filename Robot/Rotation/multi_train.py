@@ -16,8 +16,8 @@ def train(i):
     tf.keras.backend.set_session(session)
     
     
-    training_name_saq = "saq_test"
-    training_name_sqa = "sqa_test"
+    training_name_saq = "saq_test_01_3"
+    training_name_sqa = "sqa_test_01_3"
     training_names  =[training_name_saq,training_name_sqa]
     env_dict_saq = {'width': 640, 'height': 480, 'mineral_scale': .5, 
             'camera_height': 3.5,'camera_tilt':0, 
@@ -32,14 +32,14 @@ def train(i):
     env_dict_sqa['figure_name'] = training_name_sqa
     env_dicts = [env_dict_saq,env_dict_sqa]
     
-    max_moves = 150
+    max_moves = 50
     epochs = 200
-    training_dict_saq = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.001,
+    training_dict_saq = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.0001,
                  Parameters.EPOCHS: epochs, Parameters.MAX_MOVES:max_moves, Parameters.WIN_REWARD: 100,
                  Parameters.LOSS_REWARD: -100, Parameters.MAX_MEMORY_SIZE: max_moves*epochs,
                  Parameters.BATCH_SIZE: 16, Parameters.OPTIMIZER:  Optimizer.ADAM,
                  Parameters.MIN_EPSILON: .1, Parameters.TEST_EPOCHS: 20, 
-                 Parameters.TEST_MAX_MOVES:200, Parameters.EPSILON_DECAY: Decay.LINEAR, Parameters.CONTINUOUS: False}
+                 Parameters.TEST_MAX_MOVES:max_moves, Parameters.EPSILON_DECAY: Decay.LINEAR, Parameters.CONTINUOUS: False}
     training_dict_sqa = copy.deepcopy(training_dict_saq)
     training_dicts = [training_dict_saq,training_dict_sqa]
     
@@ -49,15 +49,19 @@ def train(i):
               training_dict = training_dicts[i],  network_type = network_types[i], training_name = training_names[i])
     
     training_results = agent.train()
+    
+    agent.save_all()
 
     reward_list = agent.plot_rewards()
     
     test_results = agent.test()
     
+    name = agent.training_name
+    
     session.close()
     tf.keras.backend.clear_session()
     
-    return (training_results,test_results)
+    return (name,training_results,test_results)
     
 if __name__ == "__main__":
     pool = multiprocessing.Pool(processes = 2)
