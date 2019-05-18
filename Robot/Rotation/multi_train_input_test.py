@@ -15,9 +15,11 @@ def train(i):
     tf.keras.backend.set_session(session)
     
     
-    training_name_stacked = "sqa_test_stacked"
-    training_name_rgb = "sqa_test_rgb"
-    training_names  =[training_name_stacked,training_name_rgb]
+    training_name_stacked = "sqa_test_stacked_1"
+    training_name_rgb = "sqa_test_rgb_1"
+    training_name_stacked_2 = "sqa_test_stacked_2"
+    training_name_rgb_2 = "sqa_test_rgb_2"
+    training_names  =[training_name_stacked,training_name_rgb,training_name_stacked_2,training_name_rgb_2]
     env_dict_stacked = {'width': 640, 'height': 480, 'mineral_scale': .5, 
             'camera_height': 3.5,'camera_tilt':0, 
             'actions':[Action.FORWARDS,Action.CW,Action.CCW], 
@@ -26,26 +28,34 @@ def train(i):
             'random_lighting':True, 'silver_mineral_num':3, 'point_distance':9, 'stationary_scale':6,
             'normal_scale':2, 'stationary_win_count':5, 'shift_offset': 2,
             'goal': Goal.COLLISION, 'walls_terminal': True, 'close_all':False, 'figure_name': training_name_stacked,
-            'frame_stacking': True, 'stack_size': 3, 'grayscale': True}
+            'frame_stacking': True, 'stack_size': 3, 'grayscale': True, 'penalize_turning':True}
+    
+    env_dict_stacked_2 = copy.deepcopy(env_dict_stacked)
+    env_dict_stacked_2['figure_name'] = training_name_stacked_2
     
     env_dict_rgb = copy.deepcopy(env_dict_stacked)
     env_dict_rgb['figure_name'] = training_name_rgb
     env_dict_rgb['frame_stacking'] = False
     env_dict_rgb['grayscale'] = False
-    env_dicts = [env_dict_stacked,env_dict_rgb]
     
-    max_moves = 100
-    epochs = 200
-    training_dict_stacked = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.001,
+    env_dict_rgb_2 = copy.deepcopy(env_dict_rgb)
+    env_dict_rgb_2['figure_name'] = training_name_rgb_2
+    
+    env_dicts = [env_dict_stacked,env_dict_rgb,env_dict_stacked_2,env_dict_rgb_2]
+    
+    max_moves = 150
+    epochs = 3000
+    training_dict_1 = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.0003,
                  Parameters.EPOCHS: epochs, Parameters.MAX_MOVES:max_moves, Parameters.WIN_REWARD: 100,
                  Parameters.LOSS_REWARD: -100, Parameters.MAX_MEMORY_SIZE: max_moves*epochs,
-                 Parameters.BATCH_SIZE: 16, Parameters.OPTIMIZER:  Optimizer.ADAM,
+                 Parameters.BATCH_SIZE:32, Parameters.OPTIMIZER:  Optimizer.ADAM,
                  Parameters.MIN_EPSILON: .1, Parameters.TEST_EPOCHS: 20, 
                  Parameters.TEST_MAX_MOVES:max_moves, Parameters.EPSILON_DECAY: Decay.LINEAR, Parameters.CONTINUOUS: False}
-    training_dict_rgb = copy.deepcopy(training_dict_stacked)
-    training_dicts = [training_dict_stacked,training_dict_rgb]
+    training_dict_2 = copy.deepcopy(training_dict_1)
+    training_dict_2[Parameters.ALPHA] = .001
+    training_dicts = [training_dict_1,training_dict_1,training_dict_2,training_dict_2]
     
-    network_types = [Network.S_TO_QA,Network.S_TO_QA]
+    network_types = [Network.S_TO_QA,Network.S_TO_QA,Network.S_TO_QA,Network.S_TO_QA]
     
     agent = Agent(env_type = Env.MULTI, env_dict = env_dicts[i], 
               training_dict = training_dicts[i],  network_type = network_types[i], training_name = training_names[i])
@@ -66,8 +76,9 @@ def train(i):
     return (name,training_results,test_results)
     
 if __name__ == "__main__":
-    pool = multiprocessing.Pool(processes = 2)
-    for i,results in enumerate(pool.imap(train,range(2))):
+    pool_size = 4
+    pool = multiprocessing.Pool(processes = pool_size)
+    for i,results in enumerate(pool.imap(train,range(pool_size))):
         print(results)
     
     

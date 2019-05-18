@@ -54,9 +54,10 @@ class Action(Enum):
 #class that manipulates a deque for stacking frames
 #use of deque based off deque example
 class Stacker():
-    def __init__(self, stacks = 3, frame = None):
+    def __init__(self, stacks = 3, frame = None, axis = 2):
         self.stack_size = stacks
         self.frames = collections.deque(maxlen=stacks)
+        self.axis = axis
         if frame is not None:
             self.reset_stack(frame)
     def reset_stack(self,new_frame):
@@ -68,7 +69,7 @@ class Stacker():
     def get_stack(self):
         assert(len(self.frames)==self.stack_size), "stack size invalid"
         #change this if using 4ds
-        stacked_array = np.stack(self.frames,axis=2)
+        stacked_array = np.stack(self.frames,axis=self.axis)
         return stacked_array
         
         
@@ -113,7 +114,7 @@ class Environment():
                  silver_mineral_num = 3, point_distance = 9, stationary_scale =6, 
                  normal_scale = 2, stationary_win_count = 5, shift_offset = 0, 
                  close_all = True, goal = Goal.ALIGN, penalize_walls = False, walls_terminal = False, 
-                 figure_name = None, frame_stacking = True, stack_size = 3 ):
+                 figure_name = None, frame_stacking = True, stack_size = 3, penalize_turning = False):
         
         self.reward = reward
         self.grayscale = grayscale
@@ -144,9 +145,14 @@ class Environment():
         self.penalize_walls = penalize_walls
         self.walls_terminal = walls_terminal
         self.figure_name = figure_name
+        self.penalize_turning = penalize_turning
         self.frame_stacking = frame_stacking
         self.stack_size = stack_size
-        self.stacker = Stacker(stacks = stack_size)
+        
+        axis = 2
+        if not grayscale and frame_stacking:
+            axis = 3
+        self.stacker = Stacker(stacks = stack_size,axis = axis)
         
         if close_all:
             mlab.close(all=True)
@@ -559,7 +565,10 @@ class Environment():
                 reward += previous_distance - current_distance
             else:
                 reward += self.move_reward
-                
+             
+            if self.penalize_turning:
+                if action_name == Action.CW or action_name == Action.CCW:
+                    reward += -1
             #penalization for hitting a wall
             if self.penalize_walls and wall_state == State.WALL_COLLISION:
                 if self.walls_terminal:

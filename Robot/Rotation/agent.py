@@ -92,6 +92,9 @@ class Agent():
         #Load environment arguments
         if env_file_name is not None:
             self.env_args = self.read_dict('./args/environment/' + env_file_name + '.txt')
+            if env_dict is not None:
+                for key in env_dict:
+                    self.env_args[key] = env_dict[key]
         elif env_dict is not None:
             if env_dict_string:
                 env_dict = eval(env_dict)
@@ -110,6 +113,9 @@ class Agent():
             #Load training arguments
             if training_file_name is not None:
                 self.parameter_dict = self.read_dict('./args/training/' + training_file_name + '.txt')
+                if training_dict is not None:
+                    for key in training_dict:
+                        self.parameter_dict[key] = training_dict[key]
             elif training_dict is not None:
                 self.parameter_dict = training_dict
             else:
