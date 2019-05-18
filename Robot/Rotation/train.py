@@ -13,11 +13,11 @@ env_dict = {'width': 640, 'height': 480, 'mineral_scale': .5,
             'decorations':True,'resize_scale':16, 'silver': (.8,.8,.8), 'random_colors':True,
             'random_lighting':True, 'silver_mineral_num':3, 'point_distance':9, 'stationary_scale':6,
             'normal_scale':2, 'stationary_win_count':5, 'shift_offset': 2,
-            'goal': Goal.ALIGN, 'walls_terminal': True}
+            'goal': Goal.ALIGN, 'walls_terminal': True,'frame_stacking': True, 'stack_size': 3}
 #dictionary containing arguments for training settings
 
 training_dict = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.001,
-                 Parameters.EPOCHS: 3, Parameters.MAX_MOVES:20, Parameters.WIN_REWARD: 100,
+                 Parameters.EPOCHS: 10, Parameters.MAX_MOVES:20, Parameters.WIN_REWARD: 100,
                  Parameters.LOSS_REWARD: -100, Parameters.MAX_MEMORY_SIZE: 10 * 150,
                  Parameters.BATCH_SIZE: 16, Parameters.OPTIMIZER:  Optimizer.ADAM,
                  Parameters.MIN_EPSILON: .1, Parameters.TEST_EPOCHS: 3, 

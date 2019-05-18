@@ -137,16 +137,20 @@ class Agent():
                 self.model = custom_network
             else:
                 image_shape = np.shape(self.env.screenshot())
+                if self.env.frame_stacking:
+                    image_shape += (self.env.stacker.stack_size,)
+                print(image_shape)
                 num_actions = self.num_actions 
+                kernel_size = (5,5)
                 if network_type == Network.SA_TO_Q:
                     
                     image_input = tf.keras.Input(shape=image_shape)
             
-                    conv1 = tf.keras.layers.Conv2D(32, kernel_size=(5, 5), activation=tf.keras.activations.relu,strides=1)(image_input)
+                    conv1 = tf.keras.layers.Conv2D(32, kernel_size=kernel_size, activation=tf.keras.activations.relu,strides=1)(image_input)
                     pooling1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
                     drop1 = tf.keras.layers.Dropout(.25)(pooling1)
                     
-                    conv2 = tf.keras.layers.Conv2D(64, kernel_size=(5, 5), strides=1, activation=tf.keras.activations.relu)(drop1)
+                    conv2 = tf.keras.layers.Conv2D(64, kernel_size=kernel_size, strides=1, activation=tf.keras.activations.relu)(drop1)
                     pooling2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
                     drop2 = tf.keras.layers.Dropout(0.25)(pooling2)
                     
@@ -165,11 +169,11 @@ class Agent():
                 elif network_type == Network.S_TO_QA:
                     image_input = tf.keras.Input(shape=image_shape)
             
-                    conv1 = tf.keras.layers.Conv2D(32, kernel_size=(5, 5), activation=tf.keras.activations.relu,strides=1)(image_input)
+                    conv1 = tf.keras.layers.Conv2D(32, kernel_size=kernel_size, activation=tf.keras.activations.relu,strides=1)(image_input)
                     pooling1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
                     drop1 = tf.keras.layers.Dropout(.25)(pooling1)
                     
-                    conv2 = tf.keras.layers.Conv2D(64, kernel_size=(5, 5), strides=1, activation=tf.keras.activations.relu)(drop1)
+                    conv2 = tf.keras.layers.Conv2D(64, kernel_size=kernel_size, strides=1, activation=tf.keras.activations.relu)(drop1)
                     pooling2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
                     drop2 = tf.keras.layers.Dropout(0.25)(pooling2)
                     

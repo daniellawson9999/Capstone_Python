@@ -16,8 +16,8 @@ def train(i):
     tf.keras.backend.set_session(session)
     
     
-    training_name_saq = "saq_test_01_3"
-    training_name_sqa = "sqa_test_01_3"
+    training_name_saq = "saq_test_stacked"
+    training_name_sqa = "sqa_test_stacked"
     training_names  =[training_name_saq,training_name_sqa]
     env_dict_saq = {'width': 640, 'height': 480, 'mineral_scale': .5, 
             'camera_height': 3.5,'camera_tilt':0, 
@@ -26,15 +26,16 @@ def train(i):
             'decorations':True,'resize_scale':16, 'silver': (.8,.8,.8), 'random_colors':True,
             'random_lighting':True, 'silver_mineral_num':3, 'point_distance':9, 'stationary_scale':6,
             'normal_scale':2, 'stationary_win_count':5, 'shift_offset': 2,
-            'goal': Goal.COLLISION, 'walls_terminal': True, 'close_all':False, 'figure_name': training_name_saq}
+            'goal': Goal.COLLISION, 'walls_terminal': True, 'close_all':False, 'figure_name': training_name_saq,
+            'frame_stacking': True, 'stack_size': 3}
     
     env_dict_sqa = copy.deepcopy(env_dict_saq)
     env_dict_sqa['figure_name'] = training_name_sqa
     env_dicts = [env_dict_saq,env_dict_sqa]
     
-    max_moves = 50
-    epochs = 200
-    training_dict_saq = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.0001,
+    max_moves = 100
+    epochs = 20
+    training_dict_saq = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.001,
                  Parameters.EPOCHS: epochs, Parameters.MAX_MOVES:max_moves, Parameters.WIN_REWARD: 100,
                  Parameters.LOSS_REWARD: -100, Parameters.MAX_MEMORY_SIZE: max_moves*epochs,
                  Parameters.BATCH_SIZE: 16, Parameters.OPTIMIZER:  Optimizer.ADAM,

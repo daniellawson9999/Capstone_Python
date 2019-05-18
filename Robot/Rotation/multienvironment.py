@@ -10,6 +10,7 @@ from enum import Enum,auto
 import copy
 import cv2
 import random
+import collections
 
 
 
@@ -49,6 +50,28 @@ class Action(Enum):
     CW = auto()
     CCW = auto()
     STAY = auto()
+
+#class that manipulates a deque for stacking frames
+#use of deque based off deque example
+class Stacker():
+    def __init__(self, stacks = 3, frame = None):
+        self.stack_size = stacks
+        self.frames = collections.deque(maxlen=stacks)
+        if frame is not None:
+            self.reset_stack(frame)
+    def reset_stack(self,new_frame):
+        self.frames.clear()
+        for i in range(self.stack_size):
+            self.frames.append(new_frame)
+    def add_frame(self,frame):
+        self.frames.append(frame)
+    def get_stack(self):
+        assert(len(self.frames)==self.stack_size), "stack size invalid"
+        #change this if using 4ds
+        stacked_array = np.stack(self.frames,axis=2)
+        return stacked_array
+        
+        
     
 class Environment():  
     square_width = 23.5
@@ -89,7 +112,8 @@ class Environment():
                  k=5,silver=(.5,.5,.7), random_colors = False,random_lighting=False,
                  silver_mineral_num = 3, point_distance = 9, stationary_scale =6, 
                  normal_scale = 2, stationary_win_count = 5, shift_offset = 0, 
-                 close_all = True, goal = Goal.ALIGN, penalize_walls = False, walls_terminal = False, figure_name = None):
+                 close_all = True, goal = Goal.ALIGN, penalize_walls = False, walls_terminal = False, 
+                 figure_name = None, frame_stacking = True, stack_size = 3 ):
         
         self.reward = reward
         self.grayscale = grayscale
@@ -120,6 +144,10 @@ class Environment():
         self.penalize_walls = penalize_walls
         self.walls_terminal = walls_terminal
         self.figure_name = figure_name
+        self.frame_stacking = frame_stacking
+        self.stack_size = stack_size
+        self.stacker = Stacker(stacks = stack_size)
+        
         if close_all:
             mlab.close(all=True)
         self.width = width
@@ -556,8 +584,13 @@ class Environment():
                done = True
             
         next_state = self.screenshot()
+        if self.frame_stacking:
+            self.stacker.add_frame(next_state)
+            output_state = self.stacker.get_stack()
+        else:
+            output_state = next_state
         
-        return next_state, reward, done, game_state
+        return output_state, reward, done, game_state
     
     #used for debugging collission, draws spheres representing the collision box
     def display(self):
@@ -630,7 +663,7 @@ class Environment():
         return array
  
    
-    def reset(self):
+    def reset(self, full_reset = False):
         #modify this line, needs to ignore the collided zone
         self.stationary_count = 0
         
@@ -643,11 +676,20 @@ class Environment():
             self.randomize_lighting()
         
         #self.init_position()
+        state = self.screenshot()
+        if self.frame_stacking:
+            #if doign a full reset or the stack size is 0, clear it.
+            if full_reset or len(self.stacker.frames) == 0:
+                self.stacker.reset_stack(state)
+            else:
+                self.stacker.add_frame(state)
+            return self.stacker.get_stack()
+        else:
+            return state
 
-        return self.screenshot() 
     
     def full_reset(self):
         self.exclude_zone = 4
-        ss = self.reset()
+        ss = self.reset(full_reset=True)
         self.init_position()
         return ss
