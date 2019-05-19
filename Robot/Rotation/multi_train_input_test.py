@@ -44,12 +44,12 @@ def train(i):
     env_dicts = [env_dict_stacked,env_dict_rgb,env_dict_stacked_2,env_dict_rgb_2]
     
     max_moves = 150
-    epochs = 3000
+    epochs = 500
     training_dict_1 = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.0003,
                  Parameters.EPOCHS: epochs, Parameters.MAX_MOVES:max_moves, Parameters.WIN_REWARD: 100,
                  Parameters.LOSS_REWARD: -100, Parameters.MAX_MEMORY_SIZE: max_moves*epochs,
                  Parameters.BATCH_SIZE:32, Parameters.OPTIMIZER:  Optimizer.ADAM,
-                 Parameters.MIN_EPSILON: .1, Parameters.TEST_EPOCHS: 20, 
+                 Parameters.MIN_EPSILON: .01, Parameters.TEST_EPOCHS: 20, 
                  Parameters.TEST_MAX_MOVES:max_moves, Parameters.EPSILON_DECAY: Decay.LINEAR, Parameters.CONTINUOUS: False}
     training_dict_2 = copy.deepcopy(training_dict_1)
     training_dict_2[Parameters.ALPHA] = .001

@@ -114,7 +114,7 @@ class Environment():
                  silver_mineral_num = 3, point_distance = 9, stationary_scale =6, 
                  normal_scale = 2, stationary_win_count = 5, shift_offset = 0, 
                  close_all = True, goal = Goal.ALIGN, penalize_walls = False, walls_terminal = False, 
-                 figure_name = None, frame_stacking = True, stack_size = 3, penalize_turning = False):
+                 figure_name = None, frame_stacking = False, stack_size = 3, penalize_turning = False):
         
         self.reward = reward
         self.grayscale = grayscale
