@@ -50,14 +50,17 @@ class Action(Enum):
     CW = auto()
     CCW = auto()
     STAY = auto()
+    
+
 
 #class that manipulates a deque for stacking frames
 #use of deque based off deque example
 class Stacker():
-    def __init__(self, stacks = 3, frame = None, axis = 2):
+    def __init__(self, stacks = 3, frame = None, axis = 2,concatenate=True):
         self.stack_size = stacks
         self.frames = collections.deque(maxlen=stacks)
         self.axis = axis
+        self.concatenate = concatenate
         if frame is not None:
             self.reset_stack(frame)
     def reset_stack(self,new_frame):
@@ -69,7 +72,11 @@ class Stacker():
     def get_stack(self):
         assert(len(self.frames)==self.stack_size), "stack size invalid"
         #change this if using 4ds
-        stacked_array = np.stack(self.frames,axis=self.axis)
+        if self.concatenate:
+            stacked_array = np.concatenate([frame for frame in self.frames],2)
+        else:
+            #stacked_array = np.stack(self.frames,axis=self.axis)
+            stacked_array = list(self.frames)
         return stacked_array
         
         
@@ -114,7 +121,7 @@ class Environment():
                  silver_mineral_num = 3, point_distance = 9, stationary_scale =6, 
                  normal_scale = 2, stationary_win_count = 5, shift_offset = 0, 
                  close_all = True, goal = Goal.ALIGN, penalize_walls = False, walls_terminal = False, 
-                 figure_name = None, frame_stacking = False, stack_size = 3, penalize_turning = False):
+                 figure_name = None, frame_stacking = False, stack_size = 3, concatenate = False, penalize_turning = False):
         
         self.reward = reward
         self.grayscale = grayscale
@@ -148,11 +155,14 @@ class Environment():
         self.penalize_turning = penalize_turning
         self.frame_stacking = frame_stacking
         self.stack_size = stack_size
+        self.concatenate = concatenate
         
         axis = 2
         if not grayscale and frame_stacking:
             axis = 3
-        self.stacker = Stacker(stacks = stack_size,axis = axis)
+        self.stacker = None
+        if frame_stacking:
+            self.stacker = Stacker(stacks = stack_size,axis = axis, concatenate=concatenate)
         
         if close_all:
             mlab.close(all=True)

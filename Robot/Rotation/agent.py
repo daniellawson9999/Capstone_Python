@@ -46,10 +46,14 @@ class Optimizer(Enum):
 class Decay(Enum):
     LINEAR = auto()
     
-#Enum that contains types of networks  
+#Enum that contains types of networks
+#SA_TO_Q = a network with state-action input that ouputs a single q value
+#S_TO_QA = a network with state input that ouputs a q value for each action
+#SM_TO_QA = a network with multiple state input (frame stacking) that outputs a q value for each action
 class Network(Enum):
     SA_TO_Q = auto()
     S_TO_QA = auto()
+    SM_TO_QA = auto()
     
 #based off deque example
 class ReplayMemory():
@@ -143,11 +147,27 @@ class Agent():
                 self.model = custom_network
             else:
                 image_shape = np.shape(self.env.screenshot())
+                #fix this
                 if self.env.frame_stacking:
-                    image_shape += (self.env.stacker.stack_size,)
-                print(image_shape)
+                    #a tupple
+                    base_size = image_shape[0:2]
+                    #a scalar
+                    channels = image_shape[2]
+                    stack_size = self.env.stacker.stack_size
+                    #example stack- image dimensions: 30 x 40, stack size: 4, channels: 3
+                    if self.env.concatenate:
+                        #should be width by height by (channels * stack size)
+                        #so 30 x 40 x 12
+                        image_shape = base_size + (channels * stack_size,)
+                    #else:
+                        #hould be stack size by height  by width by channels
+                        #so 4 x 30 x 40 x 3
+                        #image_shape = (stack_size,) + base
+                #print(image_shape)
                 num_actions = self.num_actions 
                 kernel_size = (5,5)
+                
+                #default models for each network type
                 if network_type == Network.SA_TO_Q:
                     
                     image_input = tf.keras.Input(shape=image_shape)
@@ -188,6 +208,37 @@ class Agent():
                     output = tf.keras.layers.Dense(num_actions,activation=tf.keras.activations.linear)(conv_dense)
                     
                     self.model = tf.keras.Model(inputs=image_input, outputs = output)
+                   
+                elif network_type == Network.SM_TO_QA:
+                    #concat should be false
+                    stack_size = self.env.stacker.stack_size
+                    input_layer_list = []
+                    dense_layer_list = []
+                    for i in range(stack_size):
+                       
+                        image_input = tf.keras.Input(shape=image_shape)
+                        
+                        conv1 = tf.keras.layers.Conv2D(32, kernel_size=kernel_size, activation=tf.keras.activations.relu,strides=1)(image_input)
+                        pooling1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
+                        drop1 = tf.keras.layers.Dropout(.25)(pooling1)
+                    
+                        conv2 = tf.keras.layers.Conv2D(64, kernel_size=kernel_size, strides=1, activation=tf.keras.activations.relu)(drop1)
+                        pooling2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+                        drop2 = tf.keras.layers.Dropout(0.25)(pooling2)
+                            
+                        
+                        flat = tf.keras.layers.Flatten()(drop2)
+                        
+                        #add to layer lists
+                        input_layer_list.append(image_input)
+                        dense_layer_list.append(flat)
+                        
+                    merged_dense = tf.keras.layers.concatenate(dense_layer_list)
+                    dense1 = tf.keras.layers.Dense(100,activation=tf.keras.activations.relu)(merged_dense)
+                    dense2 = tf.keras.layers.Dense(100,activation=tf.keras.activations.relu)(dense1)
+                    output = tf.keras.layers.Dense(num_actions,activation=tf.keras.activations.linear)(dense2)
+                    
+                    self.model = tf.keras.Model(inputs = input_layer_list, outputs = output)
                 else:
                     raise Exception('invalid network type')
                 #compile the model
@@ -266,6 +317,8 @@ class Agent():
         elif self.network_type == Network.S_TO_QA:
             #check this out
             actions = self.model.predict(np.expand_dims(state,0))[0]
+        elif self.network_type == Network.SM_TO_QA:
+            actions = list(self.model.predict([frame for frame in np.expand_dims(state,1)]))[0]
         else:    
             raise Exception('invalid network type')
         max_index = 0
@@ -317,7 +370,7 @@ class Agent():
                 actions = list(np.zeros(self.BATCH_SIZE))
                 if self.network_type == Network.SA_TO_Q:
                     targets = list(np.zeros(self.BATCH_SIZE))
-                elif self.network_type == Network.S_TO_QA:
+                elif self.network_type == Network.S_TO_QA or self.network_type == Network.SM_TO_QA:
                     targets = list(np.zeros((self.BATCH_SIZE,self.num_actions)))
                 else:
                     raise Exception('invalid network type')
@@ -355,9 +408,15 @@ class Agent():
                         else:
                             index, value = self.predict(n_s,l)
                             targets[j] = r + self.GAMMA * value
-                    elif self.network_type == Network.S_TO_QA:
+                    elif self.network_type == Network.S_TO_QA or Network.SM_TO_QA:
                         #init target array to for example j to be equal to the predicted
-                        targets[j] = list(self.model.predict(np.expand_dims(states[j],0))[0])
+                       
+                        
+                        if self.network_type == Network.S_TO_QA:
+                            targets[j] = list(self.model.predict(np.expand_dims(states[j],0))[0])
+                        else:
+                            targets[j] = list(self.model.predict([frame for frame in np.expand_dims(states[j],1)]))[0]
+
                         #change the value for the desired action to be equal to b equation
                         if t:
                             targets[j][a] = r
@@ -373,6 +432,14 @@ class Agent():
                     x = [states,actions]
                 elif self.network_type ==  Network.S_TO_QA:
                     x = states
+                elif self.network_type == Network.SM_TO_QA:
+                    #targets[j] = list(self.model.predict([frame for frame in np.expand_dims(states[j],1)]))[0]
+                    #x = np.expand_dims(states,2)\
+                    output = [[] for i in range(self.BATCH_SIZE)]
+                    for i in range(self.BATCH_SIZE):
+                        for j in range(self.env.stack_size):
+                            output[j].append(states[i][j])
+                    x= output
                 else:
                     raise Exception('invalid network type in training')
                 y = targets
