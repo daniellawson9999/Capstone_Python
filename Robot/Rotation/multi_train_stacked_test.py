@@ -16,7 +16,7 @@ def train(i):
     
     
     training_name_sqa = "sqa_stacked_1"
-    training_name_smqa = "smqa_stacked_1"
+    training_name_smqa = "smqa_stacked_1_2"
     training_name_sqa_2 = "sqa_stacked_2"
     training_name_smqa_2 = "smqa_stacked_2"
     training_names  =[training_name_sqa,training_name_smqa,training_name_sqa_2,training_name_smqa_2]
@@ -44,7 +44,7 @@ def train(i):
     env_dicts = [env_dict_sqa,env_dict_smqa,env_dict_sqa_2,env_dict_smqa_2]
     
     max_moves = 150
-    epochs = 750
+    epochs = 1500
     training_dict_1 = {Parameters.START_EPSILON:1,Parameters.GAMMA:.95, Parameters.ALPHA:.001,
                  Parameters.EPOCHS: epochs, Parameters.MAX_MOVES:max_moves, Parameters.WIN_REWARD: 100,
                  Parameters.LOSS_REWARD: -100, Parameters.MAX_MEMORY_SIZE: max_moves*epochs,
@@ -77,10 +77,13 @@ def train(i):
     return (name,training_results,test_results)
     
 if __name__ == "__main__":
-    pool_size = 4
-    pool = multiprocessing.Pool(processes = pool_size)
-    for i,results in enumerate(pool.imap(train,range(pool_size))):
-        print(results)
+    #pool_size = 4
+    #pool = multiprocessing.Pool(processes = pool_size)
+    #for i,results in enumerate(pool.imap(train,range(pool_size))):
+    #    print(results)
+    p = multiprocessing.Process(target=train, args=(1,))
+    p.start()
+    p.join()
    
     
 

@@ -6,10 +6,10 @@ import numpy as np
 import matplotlib
 matplotlib.interactive(True)
 
-training_name = "sqa_test_rgb_limited_actions_2"
+training_name = "smqa_stacked_1"
 env_file_name = training_name
 model_load_name = training_name
-network_type = Network.S_TO_QA
+network_type = Network.SM_TO_QA
 training_file_name = training_name
 #create agent using dictionaries
 agent = Agent(env_type = Env.MULTI, env_file_name = env_file_name, 
