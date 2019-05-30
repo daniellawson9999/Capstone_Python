@@ -1,6 +1,7 @@
 #this class implements trainining using the agent class
 from multienvironment import Action, Reward, Goal
-from agent import Agent, Parameters, Decay, Modes, Env, Network, Optimizer
+from agent import Agent, Parameters, Decay, Modes, Env, Optimizer
+from networks import Network
 import tensorflow as tf
 import numpy as np
 import matplotlib

@@ -36,6 +36,7 @@ class Goal(Enum):
     COLLISION = auto()
     ALIGN = auto()
 
+#relative and proportional not implemented for multienvironment
 class Reward(Enum):
     TERMINAL = auto()
     RELATIVE = auto()
@@ -573,8 +574,10 @@ class Environment():
                 current_distance = distance(new_pos[0],new_pos[1],gold_mineral.x,gold_mineral.y)
                 
                 reward += previous_distance - current_distance
-            else:
+            elif self.reward == Reward.TERMINAL:
                 reward += self.move_reward
+            else:
+                raise Exception('reward not found')
              
             if self.penalize_turning:
                 if action_name == Action.CW or action_name == Action.CCW:

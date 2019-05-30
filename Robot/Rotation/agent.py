@@ -8,6 +8,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import copy
 from time import time
+from network_builder import NetworkBuilder
+from networks import Networks, Network
 
 
 #Used to define the overall use of the training
@@ -45,16 +47,7 @@ class Optimizer(Enum):
 
 class Decay(Enum):
     LINEAR = auto()
-    
-#Enum that contains types of networks
-#SA_TO_Q = a network with state-action input that ouputs a single q value
-#S_TO_QA = a network with state input that ouputs a q value for each action
-#SM_TO_QA = a network with multiple state input (frame stacking) that outputs a q value for each action
-class Network(Enum):
-    SA_TO_Q = auto()
-    S_TO_QA = auto()
-    SM_TO_QA = auto()
-    
+        
 #based off deque example
 class ReplayMemory():
     def __init__(self, size):
@@ -143,10 +136,17 @@ class Agent():
             self.model = tf.keras.models.load_model('./models/' + model_load_name + '.h5')
         else:
             #create a new model following one of the preset models, or create a new custom model
+            image_shape = np.shape(self.env.screenshot())
+            num_actions = self.num_actions 
             if custom_network is not None:
-                self.model = custom_network
+                
+                argument_dict = {'image_shape':image_shape,'num_actions':num_actions}
+                if network_type == Network.SM_TO_QA:
+                    argument_dict['stack_size'] = self.env.stacker.stack_size
+                network_builder = NetworkBuilder(custom_network,network_type,argument_dict)
+                self.model = network_builder.get_model()
             else:
-                image_shape = np.shape(self.env.screenshot())
+                
                 #fix this
                 if self.env.frame_stacking:
                     #a tupple

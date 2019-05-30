@@ -2,7 +2,8 @@ import multiprocessing
 
 def train(i):
     from multienvironment import Action, Reward, Goal
-    from agent import Agent, Parameters, Decay, Modes, Env, Network, Optimizer
+    from agent import Agent, Parameters, Decay, Modes, Env, Optimizer
+    from networks import Network
     import tensorflow as tf
     import matplotlib
     import copy
