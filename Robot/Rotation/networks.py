@@ -12,3 +12,6 @@ class Network(Enum):
 
 class Networks(Enum):
     DOOM_CNN_SM = auto()
+    DUELING_SM = auto()
+    DUELING_S = auto()
+    DUELING_LSTM_SM = auto()

@@ -40,6 +40,8 @@ class Parameters(Enum):
     TEST_EPOCHS = auto()
     TEST_MAX_MOVES = auto()
     CONTINUOUS = auto()
+    DOUBLE = auto()
+    MAX_TAU = auto()
     
 class Optimizer(Enum):
     ADAM = auto()
@@ -124,7 +126,10 @@ class Agent():
               #  for parameter in Parameters:
                  #   if parameter not in parameter_dict:
                     #    raise Exception('parameter list is missing required parameters for training')
-        
+            
+            #initialize all training parameters as None, so those that are not used are still defined
+            for parameter in Parameters:
+                setattr(self,parameter.name,None)
             #convert parameter list to class fields
             for parameter in self.parameter_dict:
                 #in case string based parameters are supported, this may not be needed
@@ -241,17 +246,22 @@ class Agent():
                     self.model = tf.keras.Model(inputs = input_layer_list, outputs = output)
                 else:
                     raise Exception('invalid network type')
-                #compile the model
-        #self.model should now be defined, compile the model if training
-        self.tensorboard = None
-        self.replay_memory = None
+            
         
         #other variables for training
+        self.target_model = None
+        self.tensorboard = None
+        self.replay_memory = None
         self.reward_list = []
         self.epsilon = 1
         self.epsilon_decay_function = None
         
+        #self.model should now be defined, compile the model if training
         if training_mode is not Modes.TESTING:
+            #copy the model if using double q learning
+            if self.DOUBLE:
+                self.target_model = tf.keras.models.clone_model(self.model)
+        
             #redo this logic eventually, support all tf optimizers
             if self.OPTIMIZER == Optimizer.ADAM:
                 self.OPTIMIZER = tf.keras.optimizers.Adam
@@ -259,7 +269,9 @@ class Agent():
                 self.OPTIMIZER = tf.keras.optimizers.SGD
             if self.OPTIMIZER is None:
                 self.OPTIMIZER = tf.keras.optimizers.Adam
-            self.model.compile(loss=tf.keras.losses.mean_squared_error,optimizer = self.OPTIMIZER(lr = self.ALPHA))    
+            self.model.compile(loss=tf.keras.losses.mean_squared_error,optimizer = self.OPTIMIZER(lr = self.ALPHA))
+            if self.DOUBLE:
+                self.update_target()
             #test custom directory thing
             
             #initialize epsilon decay function
@@ -306,19 +318,30 @@ class Agent():
         new_epsilon = max(self.MIN_EPSILON, epsilon - increment)
         return new_epsilon
     
-    def predict(self,state,legal_actions):
+    def update_target(self):
+        if self.target_model is None:
+            raise Exception("the target network has not been initialized")
+        self.target_model.set_weights(self.model.get_weights())
+        
+    #returns the maximum q value corresponding action
+    #given an input state, legal actions
+    #defaults to self.model, can pass another model such as self.target_model
+    #can pass another action using index
+    def predict(self,state,legal_actions,model=None, index = None):
+        if model is None:
+            model = self.model
         actions = [0] * self.num_actions
         if self.network_type == Network.SA_TO_Q:
             for i in range(self.num_actions):
                 action = [0] * self.num_actions
                 action[i] = 1
                 #returns a 2d array such as [[8.0442]], we want to make an array of like [[234],[23432],[2343]]
-                actions[i] = self.model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0][0]
+                actions[i] = model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0][0]
         elif self.network_type == Network.S_TO_QA:
             #check this out
-            actions = self.model.predict(np.expand_dims(state,0))[0]
+            actions = model.predict(np.expand_dims(state,0))[0]
         elif self.network_type == Network.SM_TO_QA:
-            actions = list(self.model.predict([frame for frame in np.expand_dims(state,1)]))[0]
+            actions = list(model.predict([frame for frame in np.expand_dims(state,1)]))[0]
         else:    
             raise Exception('invalid network type')
         max_index = 0
@@ -327,10 +350,14 @@ class Agent():
                 max_index = i
             if actions[max_index] < actions[i] and legal_actions[i] == 1:
                 max_index = i
-        return max_index, actions[max_index]
+        return_index = index
+        if index is None:
+            return_index = max_index
+        return return_index, actions[return_index]
     
    
     def train(self, epochs = None):
+        tau = 0
         if epochs is None:
             epochs = self.EPOCHS
         assert (self.training_mode == Modes.TRAINING), "the class was not initialized for training"
@@ -352,6 +379,8 @@ class Agent():
             else:
                 state = self.env.reset()
             for m in range(self.MAX_MOVES):
+                if self.DOUBLE:
+                    tau += 1
                 #select an action
                 if np.random.random() > self.epsilon:
                     action,value = self.predict(state,self.env.legal_actions())
@@ -400,13 +429,17 @@ class Agent():
                     #for every other action the same as what the network currently predicts,
                     #so there is zero mean squared error on that action, meaning weights associated with 
                     #that action are not updated
+                    #if using double q learning the target the q value of the max action calculated by the main q-network
+                    #def predict(self,state,legal_actions,model=None, index = None):
                     if self.network_type == Network.SA_TO_Q:
                         #if a terminal state, the target q value is simply the reward,
                         #otherwise use the standard equation
                         if t:
                             targets[j] = r
                         else:
-                            index, value = self.predict(n_s,l)
+                            action, value = self.predict(n_s,l)
+                            if self.DOUBLE:
+                                value = self.predict(n_s,l,self.target_model,index=action)
                             targets[j] = r + self.GAMMA * value
                     elif self.network_type == Network.S_TO_QA or Network.SM_TO_QA:
                         #init target array to for example j to be equal to the predicted
@@ -421,7 +454,9 @@ class Agent():
                         if t:
                             targets[j][a] = r
                         else:
-                            index, value = self.predict(n_s,l)
+                            action, value = self.predict(n_s,l)
+                            if self.DOUBLE:
+                                value = self.predict(n_s,l,self.target_model,index=action)
                             targets[j][a] = r + self.GAMMA * value
                        
                 #convert back to np arrays for tensorflow
@@ -451,6 +486,13 @@ class Agent():
                 count += 1
                 #update state
                 state = next_state
+                
+                #update target network if using double q learning and tau is greater than max_tau
+                if self.DOUBLE:
+                    if tau > self.MAX_TAU:
+                        tau = 0
+                        self.update_target()
+                    
                 if done or m == self.MAX_MOVES - 1:
                     if game_state == self.env_import.State.WIN:
                         training_win += 1
