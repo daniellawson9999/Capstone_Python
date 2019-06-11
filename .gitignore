@@ -1,4 +1,4 @@
-.spyproject/
+spyproject/
 Robot/Rotation/__pycache__/
 Robot/Rotation/__pycache__/
-
+.pyc

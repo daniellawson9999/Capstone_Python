@@ -8,6 +8,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import copy
 from time import time
+from network_builder import NetworkBuilder
+from networks import Networks, Network
 
 
 #Used to define the overall use of the training
@@ -38,6 +40,8 @@ class Parameters(Enum):
     TEST_EPOCHS = auto()
     TEST_MAX_MOVES = auto()
     CONTINUOUS = auto()
+    DOUBLE = auto()
+    MAX_TAU = auto()
     
 class Optimizer(Enum):
     ADAM = auto()
@@ -45,12 +49,7 @@ class Optimizer(Enum):
 
 class Decay(Enum):
     LINEAR = auto()
-    
-#Enum that contains types of networks  
-class Network(Enum):
-    SA_TO_Q = auto()
-    S_TO_QA = auto()
-    
+        
 #based off deque example
 class ReplayMemory():
     def __init__(self, size):
@@ -127,7 +126,10 @@ class Agent():
               #  for parameter in Parameters:
                  #   if parameter not in parameter_dict:
                     #    raise Exception('parameter list is missing required parameters for training')
-        
+            
+            #initialize all training parameters as None, so those that are not used are still defined
+            for parameter in Parameters:
+                setattr(self,parameter.name,None)
             #convert parameter list to class fields
             for parameter in self.parameter_dict:
                 #in case string based parameters are supported, this may not be needed
@@ -139,15 +141,38 @@ class Agent():
             self.model = tf.keras.models.load_model('./models/' + model_load_name + '.h5')
         else:
             #create a new model following one of the preset models, or create a new custom model
+            image_shape = np.shape(self.env.screenshot())
+            num_actions = self.num_actions 
             if custom_network is not None:
-                self.model = custom_network
+                
+                argument_dict = {'image_shape':image_shape,'num_actions':num_actions}
+                if network_type == Network.SM_TO_QA:
+                    argument_dict['stack_size'] = self.env.stacker.stack_size
+                network_builder = NetworkBuilder(custom_network,network_type,argument_dict)
+                self.model = network_builder.get_model()
             else:
-                image_shape = np.shape(self.env.screenshot())
+                
+                #fix this
                 if self.env.frame_stacking:
-                    image_shape += (self.env.stacker.stack_size,)
-                print(image_shape)
+                    #a tupple
+                    base_size = image_shape[0:2]
+                    #a scalar
+                    channels = image_shape[2]
+                    stack_size = self.env.stacker.stack_size
+                    #example stack- image dimensions: 30 x 40, stack size: 4, channels: 3
+                    if self.env.concatenate:
+                        #should be width by height by (channels * stack size)
+                        #so 30 x 40 x 12
+                        image_shape = base_size + (channels * stack_size,)
+                    #else:
+                        #hould be stack size by height  by width by channels
+                        #so 4 x 30 x 40 x 3
+                        #image_shape = (stack_size,) + base
+                #print(image_shape)
                 num_actions = self.num_actions 
                 kernel_size = (5,5)
+                
+                #default models for each network type
                 if network_type == Network.SA_TO_Q:
                     
                     image_input = tf.keras.Input(shape=image_shape)
@@ -188,19 +213,55 @@ class Agent():
                     output = tf.keras.layers.Dense(num_actions,activation=tf.keras.activations.linear)(conv_dense)
                     
                     self.model = tf.keras.Model(inputs=image_input, outputs = output)
+                   
+                elif network_type == Network.SM_TO_QA:
+                    #concat should be false
+                    stack_size = self.env.stacker.stack_size
+                    input_layer_list = []
+                    dense_layer_list = []
+                    for i in range(stack_size):
+                       
+                        image_input = tf.keras.Input(shape=image_shape)
+                        
+                        conv1 = tf.keras.layers.Conv2D(32, kernel_size=kernel_size, activation=tf.keras.activations.relu,strides=1)(image_input)
+                        pooling1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
+                        drop1 = tf.keras.layers.Dropout(.25)(pooling1)
+                    
+                        conv2 = tf.keras.layers.Conv2D(64, kernel_size=kernel_size, strides=1, activation=tf.keras.activations.relu)(drop1)
+                        pooling2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+                        drop2 = tf.keras.layers.Dropout(0.25)(pooling2)
+                            
+                        
+                        flat = tf.keras.layers.Flatten()(drop2)
+                        
+                        #add to layer lists
+                        input_layer_list.append(image_input)
+                        dense_layer_list.append(flat)
+                        
+                    merged_dense = tf.keras.layers.concatenate(dense_layer_list)
+                    dense1 = tf.keras.layers.Dense(100,activation=tf.keras.activations.relu)(merged_dense)
+                    dense2 = tf.keras.layers.Dense(100,activation=tf.keras.activations.relu)(dense1)
+                    output = tf.keras.layers.Dense(num_actions,activation=tf.keras.activations.linear)(dense2)
+                    
+                    self.model = tf.keras.Model(inputs = input_layer_list, outputs = output)
                 else:
                     raise Exception('invalid network type')
-                #compile the model
-        #self.model should now be defined, compile the model if training
-        self.tensorboard = None
-        self.replay_memory = None
+            
         
         #other variables for training
+        self.target_model = None
+        self.tensorboard = None
+        self.replay_memory = None
         self.reward_list = []
         self.epsilon = 1
         self.epsilon_decay_function = None
         
+        #self.model should now be defined, compile the model if training
         if training_mode is not Modes.TESTING:
+            #copy the model if using double q learning
+            if self.DOUBLE:
+                self.target_model = tf.keras.models.clone_model(self.model)
+        
             #redo this logic eventually, support all tf optimizers
             if self.OPTIMIZER == Optimizer.ADAM:
                 self.OPTIMIZER = tf.keras.optimizers.Adam
@@ -208,7 +269,9 @@ class Agent():
                 self.OPTIMIZER = tf.keras.optimizers.SGD
             if self.OPTIMIZER is None:
                 self.OPTIMIZER = tf.keras.optimizers.Adam
-            self.model.compile(loss=tf.keras.losses.mean_squared_error,optimizer = self.OPTIMIZER(lr = self.ALPHA))    
+            self.model.compile(loss=tf.keras.losses.mean_squared_error,optimizer = self.OPTIMIZER(lr = self.ALPHA))
+            if self.DOUBLE:
+                self.update_target()
             #test custom directory thing
             
             #initialize epsilon decay function
@@ -255,17 +318,30 @@ class Agent():
         new_epsilon = max(self.MIN_EPSILON, epsilon - increment)
         return new_epsilon
     
-    def predict(self,state,legal_actions):
+    def update_target(self):
+        if self.target_model is None:
+            raise Exception("the target network has not been initialized")
+        self.target_model.set_weights(self.model.get_weights())
+        
+    #returns the maximum q value corresponding action
+    #given an input state, legal actions
+    #defaults to self.model, can pass another model such as self.target_model
+    #can pass another action using index
+    def predict(self,state,legal_actions,model=None, index = None):
+        if model is None:
+            model = self.model
         actions = [0] * self.num_actions
         if self.network_type == Network.SA_TO_Q:
             for i in range(self.num_actions):
                 action = [0] * self.num_actions
                 action[i] = 1
                 #returns a 2d array such as [[8.0442]], we want to make an array of like [[234],[23432],[2343]]
-                actions[i] = self.model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0][0]
+                actions[i] = model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0][0]
         elif self.network_type == Network.S_TO_QA:
             #check this out
-            actions = self.model.predict(np.expand_dims(state,0))[0]
+            actions = model.predict(np.expand_dims(state,0))[0]
+        elif self.network_type == Network.SM_TO_QA:
+            actions = list(model.predict([frame for frame in np.expand_dims(state,1)]))[0]
         else:    
             raise Exception('invalid network type')
         max_index = 0
@@ -274,10 +350,14 @@ class Agent():
                 max_index = i
             if actions[max_index] < actions[i] and legal_actions[i] == 1:
                 max_index = i
-        return max_index, actions[max_index]
+        return_index = index
+        if index is None:
+            return_index = max_index
+        return return_index, actions[return_index]
     
    
     def train(self, epochs = None):
+        tau = 0
         if epochs is None:
             epochs = self.EPOCHS
         assert (self.training_mode == Modes.TRAINING), "the class was not initialized for training"
@@ -299,6 +379,8 @@ class Agent():
             else:
                 state = self.env.reset()
             for m in range(self.MAX_MOVES):
+                if self.DOUBLE:
+                    tau += 1
                 #select an action
                 if np.random.random() > self.epsilon:
                     action,value = self.predict(state,self.env.legal_actions())
@@ -317,7 +399,7 @@ class Agent():
                 actions = list(np.zeros(self.BATCH_SIZE))
                 if self.network_type == Network.SA_TO_Q:
                     targets = list(np.zeros(self.BATCH_SIZE))
-                elif self.network_type == Network.S_TO_QA:
+                elif self.network_type == Network.S_TO_QA or self.network_type == Network.SM_TO_QA:
                     targets = list(np.zeros((self.BATCH_SIZE,self.num_actions)))
                 else:
                     raise Exception('invalid network type')
@@ -347,22 +429,34 @@ class Agent():
                     #for every other action the same as what the network currently predicts,
                     #so there is zero mean squared error on that action, meaning weights associated with 
                     #that action are not updated
+                    #if using double q learning the target the q value of the max action calculated by the main q-network
+                    #def predict(self,state,legal_actions,model=None, index = None):
                     if self.network_type == Network.SA_TO_Q:
                         #if a terminal state, the target q value is simply the reward,
                         #otherwise use the standard equation
                         if t:
                             targets[j] = r
                         else:
-                            index, value = self.predict(n_s,l)
+                            action, value = self.predict(n_s,l)
+                            if self.DOUBLE:
+                                value = self.predict(n_s,l,self.target_model,index=action)
                             targets[j] = r + self.GAMMA * value
-                    elif self.network_type == Network.S_TO_QA:
+                    elif self.network_type == Network.S_TO_QA or Network.SM_TO_QA:
                         #init target array to for example j to be equal to the predicted
-                        targets[j] = list(self.model.predict(np.expand_dims(states[j],0))[0])
+                       
+                        
+                        if self.network_type == Network.S_TO_QA:
+                            targets[j] = list(self.model.predict(np.expand_dims(states[j],0))[0])
+                        else:
+                            targets[j] = list(self.model.predict([frame for frame in np.expand_dims(states[j],1)]))[0]
+
                         #change the value for the desired action to be equal to b equation
                         if t:
                             targets[j][a] = r
                         else:
-                            index, value = self.predict(n_s,l)
+                            action, value = self.predict(n_s,l)
+                            if self.DOUBLE:
+                                value = self.predict(n_s,l,self.target_model,index=action)
                             targets[j][a] = r + self.GAMMA * value
                        
                 #convert back to np arrays for tensorflow
@@ -373,6 +467,14 @@ class Agent():
                     x = [states,actions]
                 elif self.network_type ==  Network.S_TO_QA:
                     x = states
+                elif self.network_type == Network.SM_TO_QA:
+                    #targets[j] = list(self.model.predict([frame for frame in np.expand_dims(states[j],1)]))[0]
+                    #x = np.expand_dims(states,2)\
+                    output = [[] for i in range(self.BATCH_SIZE)]
+                    for i in range(self.BATCH_SIZE):
+                        for j in range(self.env.stack_size):
+                            output[j].append(states[i][j])
+                    x= output
                 else:
                     raise Exception('invalid network type in training')
                 y = targets
@@ -384,6 +486,13 @@ class Agent():
                 count += 1
                 #update state
                 state = next_state
+                
+                #update target network if using double q learning and tau is greater than max_tau
+                if self.DOUBLE:
+                    if tau > self.MAX_TAU:
+                        tau = 0
+                        self.update_target()
+                    
                 if done or m == self.MAX_MOVES - 1:
                     if game_state == self.env_import.State.WIN:
                         training_win += 1

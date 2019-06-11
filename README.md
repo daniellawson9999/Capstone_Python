@@ -21,6 +21,8 @@ For now, here are some slides and videos about the project. I can attach scripts
 
 * [First Presentation](https://drive.google.com/open?id=1XcURH9AAJknkbxcPnv8Txodlpo6b9Jzu)
 * [Most Recent Presentation](https://drive.google.com/open?id=1J4Uh5nRSOMGiJ5obVCKwYNi3b4-Cobms)
+* [Final Presentation](https://drive.google.com/file/d/1aDaDzX2CszAm8dJNNlae2QLGeEyzgKza/view?usp=sharing)
+* [Final Presentation Script](https://drive.google.com/open?id=1Bq-ELTKPgTIAyaEwiDUgwDpyd1QiJiBh)
 * [Google Drive folder of real life and simulated photos and videos](https://drive.google.com/open?id=1ko3aLJ-0wM7GeuNC-15_1sUnDqcl2LVh)
 
 If you would like to know more about deep q learning, I would recommend the [Playing Atari with Deep Reinforcement Learning](https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf) which presented this approach. 
