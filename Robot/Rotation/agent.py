@@ -42,6 +42,10 @@ class Parameters(Enum):
     CONTINUOUS = auto()
     DOUBLE = auto()
     MAX_TAU = auto()
+    TRACE_LENGTH = auto()
+    PRE_TRAIN_EPOCHS = auto()
+    UPDATE_FREQUENCY = auto()
+    
     
 class Optimizer(Enum):
     ADAM = auto()
@@ -52,19 +56,45 @@ class Decay(Enum):
         
 #based off deque example
 class ReplayMemory():
-    def __init__(self, size):
+    def __init__(self,size):
         self.memory = collections.deque(maxlen = size)
-        
+  
     def store(self, transition):
         #transition should be an array of s,a,l,r,s',t
         self.memory.append(transition)
         
-    def sample(self,n):
+    def sample(self,n, random = True, trace_length = None):
         memory_size = len(self.memory)
-        return np.asarray([self.memory[i] for i in 
+        if random:
+            return np.asarray([self.memory[i] for i in 
                 (np.random.choice(np.arange(memory_size),size=n, replace=False))])
-
-    
+        else:
+            assert(trace_length is not None), 'trace length not defined'
+            sampled_memories = self.sample(n,random=True)
+            sampled_traces = []
+            for memory in sampled_memories:
+                starting_point = np.random.randint(0,len(memory)+1-trace_length)
+                sampled_traces.append(memory[starting_point:starting_point+trace_length])
+            return np.asarray(sampled_traces)
+        
+    #returns the last *trace_length* states, returns the same state if there's not enough states
+    #THIS SHOULD ONLY RETURN THE STATES, nOT THE ENTIRE TRANSITION
+    def get_sequence(self,trace_length):
+        #get the current sequence
+        sequence = list(self.memory)[-trace_length]
+        #which will not be long enough if there have been less than *trace_length* transitions
+        while len(sequence) < trace_length:
+            sequence.insert(0,sequence[0])
+        #the memory is solely a list of sequences
+        if len(np.shape(list(self.memory))) > 2:
+            return np.asarray(sequence)
+        else:
+            #the memory contains a full transition
+            array = []
+            for state in sequence:
+                #
+                array.append(state[4])
+            return np.asarray(array)
 
     
 class Agent():
@@ -148,6 +178,8 @@ class Agent():
                 argument_dict = {'image_shape':image_shape,'num_actions':num_actions}
                 if network_type == Network.SM_TO_QA:
                     argument_dict['stack_size'] = self.env.stacker.stack_size
+                if network_type == Network.SR_TO_QA:
+                    argument_dict['trace_length'] = self.TRACE_LENGTH
                 network_builder = NetworkBuilder(custom_network,network_type,argument_dict)
                 self.model = network_builder.get_model()
             else:
@@ -245,7 +277,7 @@ class Agent():
                     
                     self.model = tf.keras.Model(inputs = input_layer_list, outputs = output)
                 else:
-                    raise Exception('invalid network type')
+                    raise Exception('invalid network type or no default model for network type')
             
         
         #other variables for training
@@ -284,7 +316,8 @@ class Agent():
             if use_tensorboard:
                 self.tensorboard = tf.keras.callbacks.TensorBoard(log_dir='logs/{}/{}'.format(training_name,time()),batch_size = self.BATCH_SIZE,   write_grads=True,write_images=True)
                 self.tensorboard.set_model(self.model)
-                
+            if self.UPDATE_FREQUENCY is None:
+                self.UPDATE_FREQUENCY = 1
     
     
     
@@ -301,18 +334,50 @@ class Agent():
         self.save_all(save_name)
     #init object -> (init_replay_memeory -> train -> save -> test) or (func train_save_test)
     def init_replay_memory(self):
+        #possibly disbale max memory size for SR_TO_QA networks
         self.replay_memory = ReplayMemory(self.MAX_MEMORY_SIZE)
-        while len(self.replay_memory.memory) < self.BATCH_SIZE:
-            state = self.env.reset()
-            done = False
-            for i in range(self.MAX_MOVES):
-                action = self.env.sample()
-                #check this
-                next_state, reward, done,_ = self.env.step(action)
-                transition = [state, action, self.env.legal_actions(),reward,next_state,int(done)]
-                self.replay_memory.store(transition)
-                state = next_state
-                if len(self.replay_memory.memory) >= self.BATCH_SIZE: break
+        #Recurrent networks require different replay memory logic
+        #Their replay memories must be initialized to store a larger history of an entire epochs
+        #This allows a sequence of states with length TRACE_LENGTH to be sampled from each episode
+        #In this case, the main replay memory contains a list of individual replay memory objects for each epoch
+        if self.network_type == Network.SR_TO_QA:
+            while len(self.replay_memory.memory) < self.PRE_TRAIN_LENGTH:
+                epoch_memory = ReplayMemory(size = None)
+                if self.env_type == Env.MULTI:
+                    if self.CONTINUOUS:
+                        state = self.env.reset()
+                    else:
+                        state = self.env.full_reset()
+                else:
+                    state = self.env.reset()
+                done = False
+                for i in range(self.MAX_MOVES):
+                    action = self.env.sample()
+                    next_state, reward,done,_ = self.env.step(action)
+                    transition = [state,action,self.env.legal_actions(),reward,next_state,int(done)]
+                    epoch_memory.store(transition)
+                    state = next_state
+                    if done: break
+                self.replay_memory.store(epoch_memory)
+        else:
+            while len(self.replay_memory.memory) < self.BATCH_SIZE:
+                if self.env_type == Env.MULTI:
+                    if self.CONTINUOUS:
+                        state = self.env.reset()
+                    else:
+                        state = self.env.full_reset()
+                else:
+                    state = self.env.reset()
+                done = False
+                for i in range(self.MAX_MOVES):
+                    action = self.env.sample()
+                    #check this
+                    next_state, reward, done,_ = self.env.step(action)
+                    transition = [state, action, self.env.legal_actions(),reward,next_state,int(done)]
+                    self.replay_memory.store(transition)
+                    state = next_state
+                    if len(self.replay_memory.memory) >= self.BATCH_SIZE: break
+            
     def linear_decay(self,epsilon, epochs):
         increment = 1/epochs
         new_epsilon = max(self.MIN_EPSILON, epsilon - increment)
@@ -337,11 +402,12 @@ class Agent():
                 action[i] = 1
                 #returns a 2d array such as [[8.0442]], we want to make an array of like [[234],[23432],[2343]]
                 actions[i] = model.predict([np.expand_dims(state,0),np.expand_dims(action,0)])[0][0]
-        elif self.network_type == Network.S_TO_QA:
+        elif self.network_type == Network.S_TO_QA or self.network_type == Network.SR_TO_QA:
             #check this out
             actions = model.predict(np.expand_dims(state,0))[0]
         elif self.network_type == Network.SM_TO_QA:
             actions = list(model.predict([frame for frame in np.expand_dims(state,1)]))[0]
+            
         else:    
             raise Exception('invalid network type')
         max_index = 0
@@ -357,20 +423,32 @@ class Agent():
     
    
     def train(self, epochs = None):
-        tau = 0
+        #number of steps taken
+        t = 0
         if epochs is None:
             epochs = self.EPOCHS
         assert (self.training_mode == Modes.TRAINING), "the class was not initialized for training"
         #initialize the training replay memory, so that there is enough experience for the first training batch 
+        
+        #the agent takes random actions until the replay memory has enough experience
         self.init_replay_memory()
+        
         self.epsilon = 1
+        
+        #number of batches trained
         count = 0
+        
+        #number of wins and losses during training
         training_win = 0
         training_loss = 0
+        
         for i in range(epochs):
             if self.print_training:
                 print("starting iteration ", i)
+                
             total_reward = 0
+            
+        
             if self.env_type == Env.MULTI:
                 if self.CONTINUOUS:
                     state = self.env.reset()
@@ -378,12 +456,25 @@ class Agent():
                     state = self.env.full_reset()
             else:
                 state = self.env.reset()
+            
+            epoch_memory = None
+            
+            if self.network_type == Network.SR_TO_QA:
+                epoch_memory = ReplayMemory(size = None)
+                #store first state temporally to act on, will be deleted and replaced by the transition
+                epoch_memory.store(state)
+                
             for m in range(self.MAX_MOVES):
-                if self.DOUBLE:
-                    tau += 1
                 #select an action
                 if np.random.random() > self.epsilon:
-                    action,value = self.predict(state,self.env.legal_actions())
+                    if self.network_type == Network.SR_TO_QA:
+                        s = epoch_memory.get_sequence(self.TRACE_LENGTH)
+                        #remove first state to replace w/ transition
+                        if len(epoch_memory) == 1:
+                            epoch_memory.memory.pop()
+                    else:
+                        s = state
+                    action,value = self.predict(s,self.env.legal_actions())
                 else:
                     action = self.env.sample()
                 #transition  
@@ -391,108 +482,122 @@ class Agent():
                 total_reward += reward
                 #store transition
                 transition = [state,action,self.env.legal_actions(),reward,next_state,int(done)]
-                self.replay_memory.store(transition)
-                #sample batch of transitions from memory
-                batch = self.replay_memory.sample(self.BATCH_SIZE)
-                #create lists to store the states, actions, targets from the batch that will be passed to the model to train
-                states = list(np.zeros(self.BATCH_SIZE))
-                actions = list(np.zeros(self.BATCH_SIZE))
-                if self.network_type == Network.SA_TO_Q:
-                    targets = list(np.zeros(self.BATCH_SIZE))
-                elif self.network_type == Network.S_TO_QA or self.network_type == Network.SM_TO_QA:
-                    targets = list(np.zeros((self.BATCH_SIZE,self.num_actions)))
+                
+                if self.network_type == Network.SR_TO_QA:
+                    self.replay_memory.store(transition)
                 else:
-                    raise Exception('invalid network type')
+                    epoch_memory.store(transition)
                 
-                
-                for j in range(self.BATCH_SIZE):
-                    
-                    #store the onehot encoded action
-                    a = batch[j,1]
-                    onehot = [0] * self.num_actions
-                    onehot[a] = 1
-                    actions[j] = onehot
-                    
-                    #store the state
-                    s = batch[j,0]
-                    states[j] = s
-                    
-                    #obtain the next state, legal_actions, reward, and terminal to determine the target
-                    n_s = batch[j,4]
-                    l = batch[j,2]
-                    r = batch[j,3]
-                    t = batch[j,5]
-                    #the target is a little bit different depending on the style of the q network
-                    #if SA-Q network is used, the target is simply a single value
-                    #S_QA networks have multiple outputs, but we only want to adjust the network for the one
-                    #action that this example is from, so we will make the predicted values
-                    #for every other action the same as what the network currently predicts,
-                    #so there is zero mean squared error on that action, meaning weights associated with 
-                    #that action are not updated
-                    #if using double q learning the target the q value of the max action calculated by the main q-network
-                    #def predict(self,state,legal_actions,model=None, index = None):
-                    if self.network_type == Network.SA_TO_Q:
-                        #if a terminal state, the target q value is simply the reward,
-                        #otherwise use the standard equation
-                        if t:
-                            targets[j] = r
-                        else:
-                            action, value = self.predict(n_s,l)
-                            if self.DOUBLE:
-                                value = self.predict(n_s,l,self.target_model,index=action)
-                            targets[j] = r + self.GAMMA * value
-                    elif self.network_type == Network.S_TO_QA or Network.SM_TO_QA:
-                        #init target array to for example j to be equal to the predicted
-                       
+                if t % self.UPDATE_FREQUENCE == 0:
+                    #sample batch of transitions from memory
+                    if self.network_type == Network.SR_TO_QA:
+                        #if using a SR_TO_QA network, the batch contains entire epoch memories, however we instead want a trace
+                        batch = self.replay_memory.sample(self.BATCH_SIZE, random=False,trace_length=self.TRACE_LENGTH)
+                        #32x8x40x30x3    
+                    else:
+                        batch = self.replay_memory.sample(self.BATCH_SIZE)
                         
-                        if self.network_type == Network.S_TO_QA:
-                            targets[j] = list(self.model.predict(np.expand_dims(states[j],0))[0])
-                        else:
-                            targets[j] = list(self.model.predict([frame for frame in np.expand_dims(states[j],1)]))[0]
-
-                        #change the value for the desired action to be equal to b equation
-                        if t:
-                            targets[j][a] = r
-                        else:
-                            action, value = self.predict(n_s,l)
-                            if self.DOUBLE:
-                                value = self.predict(n_s,l,self.target_model,index=action)
-                            targets[j][a] = r + self.GAMMA * value
-                       
-                #convert back to np arrays for tensorflow
-                states = np.asarray(states)
-                actions = np.asarray(actions)
-                targets = np.asarray(targets)
-                if self.network_type == Network.SA_TO_Q:
-                    x = [states,actions]
-                elif self.network_type ==  Network.S_TO_QA:
-                    x = states
-                elif self.network_type == Network.SM_TO_QA:
-                    #targets[j] = list(self.model.predict([frame for frame in np.expand_dims(states[j],1)]))[0]
-                    #x = np.expand_dims(states,2)\
-                    output = [[] for i in range(self.BATCH_SIZE)]
-                    for i in range(self.BATCH_SIZE):
-                        for j in range(self.env.stack_size):
-                            output[j].append(states[i][j])
-                    x= output
-                else:
-                    raise Exception('invalid network type in training')
-                y = targets
-                loss = self.model.train_on_batch(x = x, y = y)
-                logs = {}
-                logs['loss'] = loss
-                
-                self.tensorboard.on_epoch_end(count, logs)
-                count += 1
+                    #create lists to store the states, actions, targets from the batch that will be passed to the model to train
+                    states = list(np.zeros(self.BATCH_SIZE))
+                    actions = list(np.zeros(self.BATCH_SIZE))
+                    if self.network_type == Network.SA_TO_Q:
+                        targets = list(np.zeros(self.BATCH_SIZE)) #32x1
+                    elif self.network_type == Network.S_TO_QA or self.network_type == Network.SM_TO_QA or self.network_type == Network.SR_TO_QA:
+                        targets = list(np.zeros((self.BATCH_SIZE,self.num_actions))) #32xnjum_actions
+                    else:
+                        raise Exception('invalid network type')
+                    
+                    
+                    for j in range(self.BATCH_SIZE):
+                        
+                        #store the onehot encoded action
+                        a = batch[j,1]
+                        onehot = [0] * self.num_actions
+                        onehot[a] = 1
+                        actions[j] = onehot
+                        
+                        #store the state
+                        s = batch[j,0]
+                        states[j] = s
+                        
+                        #obtain the next state, legal_actions, reward, and terminal to determine the target
+                        n_s = batch[j,4]
+                        l = batch[j,2]
+                        r = batch[j,3]
+                        t = batch[j,5]
+                        #the target is a little bit different depending on the style of the q network
+                        #if SA-Q network is used, the target is simply a single value
+                        #S_QA networks have multiple outputs, but we only want to adjust the network for the one
+                        #action that this example is from, so we will make the predicted values
+                        #for every other action the same as what the network currently predicts,
+                        #so there is zero mean squared error on that action, meaning weights associated with 
+                        #that action are not updated
+                        #if using double q learning the target the q value of the max action calculated by the main q-network
+                        #def predict(self,state,legal_actions,model=None, index = None):
+                        if self.network_type == Network.SA_TO_Q:
+                            #if a terminal state, the target q value is simply the reward,
+                            #otherwise use the standard equation
+                            if t:
+                                targets[j] = r
+                            else:
+                                action, value = self.predict(n_s,l)
+                                if self.DOUBLE:
+                                    value = self.predict(n_s,l,self.target_model,index=action)
+                                targets[j] = r + self.GAMMA * value
+                        elif self.network_type == Network.S_TO_QA or Network.SM_TO_QA or Network.SR_TO_QA:
+                            #init target array to for example j to be equal to the predicted
+                           
+                            
+                            if self.network_type == Network.S_TO_QA or Network.SR_TO_QA:
+                                targets[j] = list(self.model.predict(np.expand_dims(states[j],0))[0])
+                            else:
+                                targets[j] = list(self.model.predict([frame for frame in np.expand_dims(states[j],1)]))[0]
+    
+                            #change the value for the desired action to be equal to b equation
+                            if t:
+                                targets[j][a] = r
+                            else:
+                                action, value = self.predict(n_s,l)
+                                if self.DOUBLE:
+                                    value = self.predict(n_s,l,self.target_model,index=action)
+                                targets[j][a] = r + self.GAMMA * value
+                            
+                           
+                    #convert back to np arrays for tensorflow
+                    states = np.asarray(states)
+                    actions = np.asarray(actions)
+                    targets = np.asarray(targets)
+                    if self.network_type == Network.SA_TO_Q:
+                        x = [states,actions]
+                    elif self.network_type ==  Network.S_TO_QA or Network.SR_TO_QA:
+                        x = states
+                    elif self.network_type == Network.SM_TO_QA:
+                        #targets[j] = list(self.model.predict([frame for frame in np.expand_dims(states[j],1)]))[0]
+                        #x = np.expand_dims(states,2)\
+                        output = [[] for i in range(self.BATCH_SIZE)]
+                        for i in range(self.BATCH_SIZE):
+                            for j in range(self.env.stack_size):
+                                output[j].append(states[i][j])
+                        x= output
+                    else:
+                        raise Exception('invalid network type in training')
+                    y = targets
+                    loss = self.model.train_on_batch(x = x, y = y)
+                    logs = {}
+                    logs['loss'] = loss
+                    
+                    self.tensorboard.on_epoch_end(count, logs)
+                    count += 1
                 #update state
                 state = next_state
                 
                 #update target network if using double q learning and tau is greater than max_tau
                 if self.DOUBLE:
-                    if tau > self.MAX_TAU:
-                        tau = 0
+                    if t % self.MAX_TAU == 0:
                         self.update_target()
                     
+                t += 1
+                
                 if done or m == self.MAX_MOVES - 1:
                     if game_state == self.env_import.State.WIN:
                         training_win += 1
@@ -501,9 +606,17 @@ class Agent():
                     if(self.print_training):
                         print(self.training_name + ": total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
                         print("epsilon", self.epsilon)
+                    
                     #decrease epsilon following decay function
                     self.epsilon = self.epsilon_decay_function(self.epsilon, epochs)
+                    
+                    #add to the award list for printing
                     self.reward_list.append(total_reward)
+                    
+                    #add epoch memory to the replay memory
+                    if self.network_type == Network.SR_TO_QA: 
+                        self.replay_memory.store(epoch_memory)
+                        
                     break
         self.tensorboard.on_train_end(None)
         return training_win, training_loss
@@ -518,13 +631,23 @@ class Agent():
         if self.env_type == Env.LEGACY:
             self.env.random_location = False
         for i in range(epochs):
+            epoch_memory = None
+            if self.network_type == Network.SR_TO_QA:
+                epoch_memory = ReplayMemory(size = None)
             if self.env_type == Env.MULTI:
                 state = self.env.full_reset()
             else:
                 state = self.env.reset()
+            epoch_memory.store(state)
             for t in range(self.TEST_MAX_MOVES):
-                action,value = self.predict(state,self.env.legal_actions())
+                if self.network_type == Network.SR_TO_QA:
+                    s = epoch_memory.get_sequence(self.TRACE_LENGTH)
+                else:
+                    s = state
+                action,value = self.predict(s,self.env.legal_actions())
                 state,reward,done,game_state = self.env.step(action)
+                if self.network_type == Network.SR_TO_QA:
+                    epoch_memory.store(state)
                 if done:
                     if game_state == self.env_import.State.WIN:
                         wins += 1
