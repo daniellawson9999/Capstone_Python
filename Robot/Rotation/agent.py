@@ -7,6 +7,7 @@ import collections
 import matplotlib
 import matplotlib.pyplot as plt
 import copy
+import gym
 from time import time
 from network_builder import NetworkBuilder
 from networks import Networks, Network
@@ -18,9 +19,12 @@ class Modes(Enum):
     TESTING = auto()
     
 #Type of environment to use. Eventually legacy, the environment class, will be fully replaced by multienvironment
+#Legacy and Multi are the Mayavi environments that the agent 
+#was orginally built around
 class Env(Enum):
     LEGACY = auto()
     MULTI = auto()
+    GYM = auto()
 
 #Numerical parameters for training
 class Parameters(Enum):
@@ -101,41 +105,45 @@ class Agent():
     def __init__(self, env_type = Env.MULTI, env_dict = None, env_file_name = None, 
                  training_dict = None, training_file_name = None, env_dict_string = False, training_name=None, 
                  model_load_name = None, load_model = False, network_type = Network.SA_TO_Q, custom_network = None,
-                 training_mode=Modes.TRAINING, use_tensorboard = True, print_training=True, require_all_params = False):
+                 training_mode=Modes.TRAINING, use_tensorboard = True, print_training=True, require_all_params = False, gym_env_name = None):
         
         self.env_type = env_type
         self.training_name = training_name
         self.training_mode = training_mode
         self.network_type = network_type
         self.print_training = print_training
+        self.env_file_name = env_file_name
+        self.env_dict = env_dict
+        self.env_dict_string = env_dict_string
+        self.gym_env_name = gym_env_name
         #check for valid environment settings
         if env_type == Env.LEGACY:
             self.env_import = environment
         elif env_type == Env.MULTI:
             self.env_import = multienvironment
         else:
+            #A gym environment
             self.env_import = None
-            raise Exception('invalid environment type, refer to the Env Enum for valid env types')
         
-        
-        #Load environment arguments
-        if env_file_name is not None:
-            self.env_args = self.read_dict('./args/environment/' + env_file_name + '.txt')
-            if env_dict is not None:
-                for key in env_dict:
-                    self.env_args[key] = env_dict[key]
-        elif env_dict is not None:
-            if env_dict_string:
-                env_dict = eval(env_dict)
-            self.env_args = env_dict
-        else:
-            self.env_args = None
-            raise Exception('no environment argument parameters specified')
-        
-        #initialize the environment
-        self.env = self.env_import.Environment(**self.env_args)   
-        self.num_actions = self.env.action_space()
-    
+        #remove after testing
+#        #Load environment arguments
+#        if env_file_name is not None:
+#            self.env_args = self.read_dict('./args/environment/' + env_file_name + '.txt')
+#            if env_dict is not None:
+#                for key in env_dict:
+#                    self.env_args[key] = env_dict[key]
+#        elif env_dict is not None:
+#            if env_dict_string:
+#                env_dict = eval(env_dict)
+#            self.env_args = env_dict
+#        else:
+#            self.env_args = None
+#        
+#        #initialize the environment
+#        self.env = self.env_import.Environment(**self.env_args)
+        self.initialize_environment()
+        #self.num_actions = self.env.action_space()
+        self.num_actions = self.action_space()
     
         #load training parameters and set as class fields
         if training_mode is not Modes.TESTING: 
@@ -171,7 +179,8 @@ class Agent():
             self.model = tf.keras.models.load_model('./models/' + model_load_name + '.h5')
         else:
             #create a new model following one of the preset models, or create a new custom model
-            image_shape = np.shape(self.env.screenshot())
+            #image_shape = np.shape(self.env.screenshot())
+            image_shape = self.observation_space()
             num_actions = self.num_actions 
             if custom_network is not None:
                 
@@ -183,25 +192,24 @@ class Agent():
                 network_builder = NetworkBuilder(custom_network,network_type,argument_dict)
                 self.model = network_builder.get_model()
             else:
-                
-                #fix this
-                if self.env.frame_stacking:
-                    #a tupple
-                    base_size = image_shape[0:2]
-                    #a scalar
-                    channels = image_shape[2]
-                    stack_size = self.env.stacker.stack_size
-                    #example stack- image dimensions: 30 x 40, stack size: 4, channels: 3
-                    if self.env.concatenate:
-                        #should be width by height by (channels * stack size)
-                        #so 30 x 40 x 12
-                        image_shape = base_size + (channels * stack_size,)
-                    #else:
-                        #hould be stack size by height  by width by channels
-                        #so 4 x 30 x 40 x 3
-                        #image_shape = (stack_size,) + base
-                #print(image_shape)
-                num_actions = self.num_actions 
+                if self.env_type is not Env.GYM:
+                    #fix this
+                    if self.env.frame_stacking:
+                        #a tupple
+                        base_size = image_shape[0:2]
+                        #a scalar
+                        channels = image_shape[2]
+                        stack_size = self.env.stacker.stack_size
+                        #example stack- image dimensions: 30 x 40, stack size: 4, channels: 3
+                        if self.env.concatenate:
+                            #should be width by height by (channels * stack size)
+                            #so 30 x 40 x 12
+                            image_shape = base_size + (channels * stack_size,)
+                        #else:
+                            #hould be stack size by height  by width by channels
+                            #so 4 x 30 x 40 x 3
+                            #image_shape = (stack_size,) + base
+                    #print(image_shape)
                 kernel_size = (5,5)
                 
                 #default models for each network type
@@ -343,37 +351,25 @@ class Agent():
         if self.network_type == Network.SR_TO_QA:
             while len(self.replay_memory.memory) < self.PRE_TRAIN_LENGTH:
                 epoch_memory = ReplayMemory(size = None)
-                if self.env_type == Env.MULTI:
-                    if self.CONTINUOUS:
-                        state = self.env.reset()
-                    else:
-                        state = self.env.full_reset()
-                else:
-                    state = self.env.reset()
+                state = self.reset_environment()
                 done = False
                 for i in range(self.MAX_MOVES):
-                    action = self.env.sample()
+                    action = self.sample_action()
                     next_state, reward,done,_ = self.env.step(action)
-                    transition = [state,action,self.env.legal_actions(),reward,next_state,int(done)]
+                    transition = [state,action,self.legal_actions(),reward,next_state,int(done)]
                     epoch_memory.store(transition)
                     state = next_state
                     if done: break
                 self.replay_memory.store(epoch_memory)
         else:
             while len(self.replay_memory.memory) < self.BATCH_SIZE:
-                if self.env_type == Env.MULTI:
-                    if self.CONTINUOUS:
-                        state = self.env.reset()
-                    else:
-                        state = self.env.full_reset()
-                else:
-                    state = self.env.reset()
+                state = self.reset_environment()
                 done = False
                 for i in range(self.MAX_MOVES):
-                    action = self.env.sample()
+                    action = self.sample_action()
                     #check this
                     next_state, reward, done,_ = self.env.step(action)
-                    transition = [state, action, self.env.legal_actions(),reward,next_state,int(done)]
+                    transition = [state, action, self.legal_actions(),reward,next_state,int(done)]
                     self.replay_memory.store(transition)
                     state = next_state
                     if len(self.replay_memory.memory) >= self.BATCH_SIZE: break
@@ -449,13 +445,7 @@ class Agent():
             total_reward = 0
             
         
-            if self.env_type == Env.MULTI:
-                if self.CONTINUOUS:
-                    state = self.env.reset()
-                else:
-                    state = self.env.full_reset()
-            else:
-                state = self.env.reset()
+            state = self.reset_environment()
             
             epoch_memory = None
             
@@ -474,14 +464,14 @@ class Agent():
                             epoch_memory.memory.pop()
                     else:
                         s = state
-                    action,value = self.predict(s,self.env.legal_actions())
+                    action,value = self.predict(s,self.legal_actions())
                 else:
-                    action = self.env.sample()
+                    action = self.sample_action()
                 #transition  
                 next_state,reward, done, game_state = self.env.step(action)
                 total_reward += reward
                 #store transition
-                transition = [state,action,self.env.legal_actions(),reward,next_state,int(done)]
+                transition = [state,action,self.legal_actions(),reward,next_state,int(done)]
                 
                 if self.network_type == Network.SR_TO_QA:
                     self.replay_memory.store(transition)
@@ -585,7 +575,6 @@ class Agent():
                     loss = self.model.train_on_batch(x = x, y = y)
                     logs = {}
                     logs['loss'] = loss
-                    
                     self.tensorboard.on_epoch_end(count, logs)
                     count += 1
                 #update state
@@ -599,10 +588,12 @@ class Agent():
                 t += 1
                 
                 if done or m == self.MAX_MOVES - 1:
-                    if game_state == self.env_import.State.WIN:
-                        training_win += 1
-                    if game_state == self.env_import.State.LOSS:
-                        training_loss += 1
+                    #custom env also returns game state
+                    if self.env_type is not Env.GYM:
+                        if game_state == self.env_import.State.WIN:
+                            training_win += 1
+                        if game_state == self.env_import.State.LOSS:
+                            training_loss += 1
                     if(self.print_training):
                         print(self.training_name + ": total reward {} last iteration {} moves, total wins {}, total losses {}".format(total_reward,m+1,training_win,training_loss))
                         print("epsilon", self.epsilon)
@@ -631,14 +622,15 @@ class Agent():
         if self.env_type == Env.LEGACY:
             self.env.random_location = False
         for i in range(epochs):
+            
             epoch_memory = None
             if self.network_type == Network.SR_TO_QA:
                 epoch_memory = ReplayMemory(size = None)
-            if self.env_type == Env.MULTI:
-                state = self.env.full_reset()
-            else:
-                state = self.env.reset()
+                
+            state = self.reset_environment()
+            
             epoch_memory.store(state)
+            
             for t in range(self.TEST_MAX_MOVES):
                 if self.network_type == Network.SR_TO_QA:
                     s = epoch_memory.get_sequence(self.TRACE_LENGTH)
@@ -649,14 +641,17 @@ class Agent():
                 if self.network_type == Network.SR_TO_QA:
                     epoch_memory.store(state)
                 if done:
-                    if game_state == self.env_import.State.WIN:
-                        wins += 1
-                    elif game_state == self.env_import.State.LOSS:
-                        losses += 1 
+                    if self.env_type is not Env.GYM:
+                        if game_state == self.env_import.State.WIN:
+                            wins += 1
+                        elif game_state == self.env_import.State.LOSS:
+                            losses += 1 
                     break
-        reached_max = epochs-wins-losses
-        print(self.training_name + ": test results\n")
-        print("{} wins, {} losses, {} reached max".format(wins/epochs, losses/epochs,(reached_max)/epochs))
+        reached_max = 0 
+        if self.env_type is not Env.GYM:
+            reached_max = epochs-wins-losses
+            print(self.training_name + ": test results\n")
+            print("{} wins, {} losses, {} reached max".format(wins/epochs, losses/epochs,(reached_max)/epochs))
         return wins, losses, reached_max
 
     def plot_rewards(self):
@@ -682,11 +677,73 @@ class Agent():
             else:
                 i += 1
         return string        
-     #todo
+    
+    #environment functions
+    
+    def initialize_environment(self):
+        if self.env_type is not Env.GYM:
+                #Load environment arguments
+            if self.env_file_name is not None:
+                self.env_args = self.read_dict('./args/environment/' + self.env_file_name + '.txt')
+                if self.env_dict is not None:
+                    for key in self.env_dict:
+                        self.env_args[key] = self.env_dict[key]
+            elif self.env_dict is not None:
+                if self.env_dict_string:
+                    self.env_dict = eval(self.env_dict)
+                self.env_args = self.env_dict
+            else:
+                self.env_args = None
+            self.env = self.env_import.Environment(**self.env_args)
+        else:
+            self.env = gym.make(self.gym_env_name)
+     
+    def action_space(self):
+        if self.env_type is not Env.GYM:
+            return self.env.action_space()
+        else:
+            return self.env.action_space.n
+    
+    def observation_space(self):
+        if self.env_type is not Env.GYM:
+            return np.shape(self.env.screenshot())
+        else:
+            return self.env.observation_space.shape
+     
+    #resets the environnment and returns the state
+    def reset_environment(self):
+        if self.env_type is not Env.GYM:
+            if self.env_type == Env.MULTI:
+                    if self.CONTINUOUS:
+                        return self.env.reset()
+                    else:
+                        return self.env.full_reset()
+            else:
+                return self.env.reset()
+        else:
+            return self.env.reset()
+    
+    #randomly sampels an action
+    def sample_action(self):
+        if self.env_type is not Env.GYM:
+            return self.env.sample()
+        else:
+            return self.env.action_space.sample()
+    #returns the legal actions,gym envs do not have this implementation
+    def legal_actions(self):
+        if self.env_type is not Env.GYM:
+            return self.env.legal_actions()
+        else:
+            return [1] * self.action_space()
+    
+     
+    #parameter/environment saving functions
+    #environment saving not supported for Gym envs yet 
     def save_all(self, save_name = None):
         if save_name is None: save_name = self.training_name
         self.save_parameter_dict(save_name)
-        self.save_environment_dict(save_name)
+        if self.env_type is not Env.GYM:
+            self.save_environment_dict(save_name)
         self.save_model(save_name)
         
     def save_environment_dict(self, save_name = None):
@@ -707,9 +764,9 @@ class Agent():
         file.close()
         
     def read_dict(self, file_name):
-        Action = self.env_import.Action
-        Reward = self.env_import.Reward
-        Goal = self.env_import.Goal
+        # = self.env_import.Action
+        #Reward = self.env_import.Reward
+        #Goal = self.env_import.Goal
         file = open(file_name,"r")
         contents = file.read()
         dictionary = eval(contents)
