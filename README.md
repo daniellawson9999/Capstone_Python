@@ -25,6 +25,7 @@ Here is list of implemented algorithms:
 * Deep Q Networks (DQN) with state-action, state, and multi-state (frame stacking) model input
 * Improvements such as Dueling and Double (target) networks
 * Deep Recurrent Q Networks (DQRN) 
+* Combining algorithms, such as Deep Double Dueling Recurrent Q Networks (DDDQRN)
 
 
 ## Project Structure 
